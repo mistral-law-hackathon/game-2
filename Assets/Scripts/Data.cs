@@ -15,7 +15,8 @@ using System.Collections.Generic;
 [Serializable] public class Content { public List<CaseDef> cases; }
 [Serializable] public class RoundRec { public string move; public List<string> cards; }
 [Serializable] public class VerdictReq { public string caseId, argument; public List<string> cards; public int meter, score; public List<RoundRec> rounds; }
-[Serializable] public class Report { public string summary, error; public List<string> mistakes, proofs, precedents, nextTime, sources; }
+[Serializable] public class ReportItem { public string title, body, src; public bool ok; }
+[Serializable] public class Report { public string summary, error; public int rebutted, rounds; public List<ReportItem> mistakes, proofs, precedents; public List<string> nextTime, sources; }
 [Serializable] public class VerdictResp { public int score; public string headline, feedback; public List<string> strengths, missed; }
 [Serializable] public class GenReq { public string description; }
 [Serializable] public class ErrResp { public string error; }

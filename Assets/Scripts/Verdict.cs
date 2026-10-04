@@ -315,16 +315,14 @@ public partial class Verdict : MonoBehaviour
             Play("bad", 0.6f);
             yield break;
         }
-        if (voiceOn) yield return Fetch("narrator", c.scenes[0]);
         generating = false; desc = "";
         content.cases.Add(c);
-        StartCase(content.cases.Count - 1);
+        StartCase(content.cases.Count - 1, false);
         StartCoroutine(PreloadCase(c));
     }
 
     IEnumerator PreloadCase(CaseDef c)
     {
-        foreach (var line in c.scenes) yield return Fetch("narrator", line);
         foreach (var m in c.moves) yield return Fetch("prosecutor", m.text);
     }
 
@@ -541,8 +539,12 @@ public partial class Verdict : MonoBehaviour
     {
         Box(r, Panel, 6);
         Border(r, Line, 1, 6);
-        if (header != null) Txt(new Rect(r.x + 20, r.y + 16, r.width - 40, 20), header, 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
+        if (header == null) return;
+        Box(new Rect(r.x + 20, r.y, 36, 2), Brass, 1);
+        Txt(new Rect(r.x + 20, r.y + 16, r.width - 40, 20), "\u00a7  " + header, 12, Brass, TextAnchor.UpperLeft, FontStyle.Bold);
     }
+
+    static readonly Color Brass = Hex("C8A96A");
 
     static Color KindColor(string k) => k switch
     {
@@ -604,10 +606,12 @@ public partial class Verdict : MonoBehaviour
             GUI.DrawTexture(new Rect(0, 0, W, H), hero, ScaleMode.ScaleAndCrop, false, 0, A(Color.white, 0.2f), 0, 0);
             GUI.DrawTexture(new Rect(0, 260, W, 460), grad, ScaleMode.StretchToFill, true, 0, new Color(1, 1, 1, 0.9f), 0, 0);
         }
+        Scales(new Vector2(W / 2 - 205, 82), 54, Brass);
+        Scales(new Vector2(W / 2 + 205, 82), 54, Brass);
         Txt(new Rect(0, 40, W, 80), "VERDICT", 66, Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
-        Box(new Rect(W / 2 - 230, 130, 140, 1), Line);
-        Box(new Rect(W / 2 + 90, 130, 140, 1), Line);
-        Txt(new Rect(0, 120, W, 20), "THE AI COURTROOM", 11, Muted, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Box(new Rect(W / 2 - 230, 130, 140, 1), A(Brass, 0.6f));
+        Box(new Rect(W / 2 + 90, 130, 140, 1), A(Brass, 0.6f));
+        Txt(new Rect(0, 120, W, 20), "THE AI COURTROOM", 11, Brass, TextAnchor.MiddleCenter, FontStyle.Bold);
         Txt(new Rect(0, 152, W, 30), "You are the defence lawyer. Answer the prosecution with real law, then convince the jury.", 18, Ink, TextAnchor.MiddleCenter);
         Txt(new Rect(0, 182, W, 24), "French criminal law in ten minutes  \u00b7  win " + Threshold + "%+ of the jury  \u00b7  closing arguments judged live by Mistral AI", 14, Muted, TextAnchor.MiddleCenter, FontStyle.Italic);
 
@@ -688,15 +692,16 @@ public partial class Verdict : MonoBehaviour
 
     void DrawBrief()
     {
+        Watermark();
         var left = new Rect(70, 60, 640, 600);
-        Txt(new Rect(left.x, left.y, 400, 20), "CASE FILE  -  " + CaseLabel, 13, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
+        Txt(new Rect(left.x, left.y, 400, 20), "\u00a7  CASE FILE  -  " + CaseLabel, 13, Brass, TextAnchor.UpperLeft, FontStyle.Bold);
         float y = Para(left.x, left.y + 28, left.width, cs.title, 44, Ink, FontStyle.Bold, 8);
         y = Para(left.x, y, left.width, (IsPros ? "The accused: " : "Your client: ") + cs.client, 18, Muted, FontStyle.Normal, 26);
-        Txt(new Rect(left.x, y, 300, 20), "THE FACTS", 13, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
+        Txt(new Rect(left.x, y, 300, 20), "THE FACTS", 13, Brass, TextAnchor.UpperLeft, FontStyle.Bold);
         y += 30;
         foreach (var f in cs.facts)
         {
-            Box(new Rect(left.x, y + 9, 6, 6), Accent, 3);
+            Box(new Rect(left.x, y + 9, 6, 6), Brass, 3);
             y = Para(left.x + 20, y, left.width - 20, f, 18, Ink, FontStyle.Normal, 12);
         }
 
@@ -708,7 +713,7 @@ public partial class Verdict : MonoBehaviour
         y = Para(x, y, w, cs.definition, 16, Muted, FontStyle.Italic, 26);
         Box(new Rect(x, y, w, 1), Line);
         y += 18;
-        Txt(new Rect(x, y, w, 20), "YOUR OBJECTIVE", 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
+        Txt(new Rect(x, y, w, 20), "YOUR OBJECTIVE", 12, Brass, TextAnchor.UpperLeft, FontStyle.Bold);
         y = Para(x, y + 26, w, BriefGoal, 17, Ink, FontStyle.Bold, 10);
         y = Para(x, y, w, BriefHow, 15, Muted, FontStyle.Normal, 22);
         if (caseIdx >= 3)
@@ -723,7 +728,7 @@ public partial class Verdict : MonoBehaviour
             if (Btn(new Rect(760, 600, 300, 52), "ENTER THE COURTROOM", true)) { Go(Phase.Trial); resolved = false; Play("gavel"); SpeakMove(); }
             if (Btn(new Rect(1076, 600, 134, 52), "Back", false)) Go(Phase.Menu);
         }
-        if (Btn(new Rect(70, 600, 240, 52), "REPLAY THE FACTS", false)) PlayScene();
+        if (caseIdx < 3 && Btn(new Rect(70, 600, 240, 52), "REPLAY THE FACTS", false)) PlayScene();
     }
 
     void TopBar()
@@ -883,6 +888,7 @@ public partial class Verdict : MonoBehaviour
 
     void DrawClosing()
     {
+        Watermark();
         TopBar();
         DrawMeter(new Rect(340, 76, 600, 70));
         var p = new Rect(140, 166, 1000, 530);

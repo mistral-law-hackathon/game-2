@@ -153,7 +153,7 @@ public partial class Verdict
         if (caseIdx < 0) caseIdx = 99;
         round = 0; meter = meterShown = cs.start;
         selected.Clear(); reactions.Clear(); argument = ""; verdict = null; mpSel = null;
-        PlayScene();
+        if (caseIdx < 3) PlayScene(); else Go(Phase.Brief);
     }
 
     void MpEnd()
