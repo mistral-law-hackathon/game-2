@@ -20,7 +20,7 @@ public static class BuildScript
         c.backgroundColor = Color.black;
         cam.AddComponent<AudioListener>();
         cam.transform.position = new Vector3(0, 0, -10);
-        new GameObject("CardGame").AddComponent<CardGame>();
+        new GameObject("CardGame").AddComponent<Verdict>();
         EditorSceneManager.SaveScene(scene, ScenePath);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
     }
@@ -30,7 +30,7 @@ public static class BuildScript
     {
         CreateScene();
         PlayerSettings.companyName = "MistralLawHackathon";
-        PlayerSettings.productName = "OBJECTION! The AI Card Duel";
+        PlayerSettings.productName = "Verdict - AI Courtroom";
         PlayerSettings.runInBackground = true;
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
         PlayerSettings.WebGL.decompressionFallback = true;
