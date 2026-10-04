@@ -187,54 +187,55 @@ public partial class Verdict
     void DrawLobby()
     {
         if (hero != null) GUI.DrawTexture(new Rect(0, 0, W, H), hero, ScaleMode.ScaleAndCrop, false, 0, A(Color.white, 0.12f), 0, 0);
-        Txt(new Rect(0, 30, W, 60), "MULTIPLAYER", 44, Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
-        Txt(new Rect(0, 92, W, 26), "Two players, two screens, one link. The prosecution accuses, the defence answers with the law - Mistral AI judges.", 16, Muted, TextAnchor.MiddleCenter);
+        Txt(new Rect(0, 30, W, 60), "Multiplayer", 40, Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Lbl(new Rect(0, 90, W, 24), "Two players, two screens, one link. The prosecution accuses, the defence answers with the law.", 15, Muted, TextAnchor.MiddleCenter);
 
         var l = new Rect(90, 140, 530, 500);
-        PanelBox(l, "CREATE A ROOM");
+        PanelBox(l, "Create a Room");
         float x = l.x + 26, w = l.width - 52, y = l.y + 48;
-        Txt(new Rect(x, y, w, 18), "1.  THE CASE", 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
+        Tag(x, y, "The Case", Sub);
         y += 26;
         int n = content.cases.Count;
         for (int i = 0; i < n; i++)
         {
             if (i >= 3 && i < n - 2) continue;
             var c = content.cases[i];
-            if (Btn(new Rect(x, y, w, 38), c.title + "   -   " + c.charge, lobbyCase == i, !mpBusy)) { lobbyCase = i; Play("select"); }
+            if (Btn(new Rect(x, y, w, 38), c.title + "   \u00b7   " + c.charge, lobbyCase == i, !mpBusy)) { lobbyCase = i; Play("select"); }
             y += 44;
         }
         y += 12;
-        Txt(new Rect(x, y, w, 18), "2.  YOUR SIDE", 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
+        Tag(x, y, "Your Side", Sub);
         y += 26;
         float hw = (w - 12) / 2;
-        if (Btn(new Rect(x, y, hw, 40), "PROSECUTION", lobbyRole == "p", !mpBusy)) { lobbyRole = "p"; Play("select"); }
-        if (Btn(new Rect(x + hw + 12, y, hw, 40), "DEFENCE", lobbyRole == "d", !mpBusy)) { lobbyRole = "d"; Play("select"); }
-        Para(x, y + 52, w, lobbyRole == "p"
-            ? "Each round you choose an accusation and push the jury towards GUILTY."
-            : "Each round you answer the accusation with law cards and fight for an acquittal.", 13, Muted, FontStyle.Italic);
-        if (Btn(new Rect(x, l.yMax - 64, w, 46), mpBusy ? "OPENING..." : "CREATE ROOM", true, !mpBusy)) StartCoroutine(MpEnter(true));
+        if (Btn(new Rect(x, y, hw, 40), "Prosecution", lobbyRole == "p", !mpBusy)) { lobbyRole = "p"; Play("select"); }
+        if (Btn(new Rect(x + hw + 12, y, hw, 40), "Defence", lobbyRole == "d", !mpBusy)) { lobbyRole = "d"; Play("select"); }
+        Lbl(new Rect(x, y + 52, w, 34), lobbyRole == "p"
+            ? "Each round you choose an accusation and push the jury towards guilty."
+            : "Each round you answer the accusation with law cards and fight for an acquittal.", 13, Muted);
+        if (Btn(new Rect(x, l.yMax - 64, w, 46), mpBusy ? "Opening..." : "Create Room", true, !mpBusy)) StartCoroutine(MpEnter(true));
 
         var r = new Rect(660, 140, 530, 500);
-        PanelBox(r, "JOIN A ROOM");
+        PanelBox(r, "Join a Room");
         x = r.x + 26; w = r.width - 52;
         y = Para(x, r.y + 48, w, "Enter the 4-letter code shown on the other player's screen.", 15, Ink, FontStyle.Normal, 18);
-        codeSt ??= new GUIStyle(area) { fontSize = 34, font = fBold, alignment = TextAnchor.MiddleCenter };
+        codeSt ??= new GUIStyle(area) { fontSize = 34, font = sSemi, alignment = TextAnchor.MiddleCenter };
         var cr = new Rect(r.center.x - 130, y, 260, 72);
         Border(Grow(cr, 1), Line, 1, 8);
         GUI.SetNextControlName("code");
+        foreach (var s in new[] { codeSt.normal, codeSt.focused, codeSt.hover, codeSt.active }) s.textColor = Gold;
         codeInput = new string(GUI.TextField(cr, codeInput, 4, codeSt).Where(char.IsLetter).ToArray()).ToUpper();
-        if (codeInput.Length == 0) Txt(cr, "ABCD", 34, A(Muted, 0.35f), TextAnchor.MiddleCenter, FontStyle.Bold);
+        if (codeInput.Length == 0) Lbl(cr, "ABCD", 34, A(Muted, 0.3f), TextAnchor.MiddleCenter, true);
         y = cr.yMax + 18;
-        if (Btn(new Rect(x, y, w, 46), "JOIN ROOM", true, codeInput.Length == 4 && !mpBusy)) StartCoroutine(MpEnter(false));
+        if (Btn(new Rect(x, y, w, 46), "Join Room", true, codeInput.Length == 4 && !mpBusy)) StartCoroutine(MpEnter(false));
         y += 70;
         Box(new Rect(x, y, w, 1), Line);
         y += 18;
-        Txt(new Rect(x, y, w, 18), "HOW TO CONNECT", 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
-        y = Para(x, y + 26, w, "Both players open the same link in their browser:", 14, Ink, FontStyle.Normal, 6);
-        y = Para(x, y, w, Base, 14, Accent, FontStyle.Italic, 10);
-        Para(x, y, w, "One player creates a room, the other joins with its code. Each side only sees its own cards.", 14, Muted);
+        Tag(x, y, "How to Connect", Sub);
+        y = Para(x, y + 24, w, "Both players open the same link in their browser:", 14, Ink, FontStyle.Normal, 6);
+        y = LPara(x, y, w, Base, 13, Sub, false, 10);
+        Lbl(new Rect(x, y, w, 36), "One player creates a room, the other joins with its code. Each side only sees its own cards.", 13, Muted);
 
-        if (mpErr != null) Txt(new Rect(240, 652, 800, 44), mpErr, 14, Red, TextAnchor.MiddleCenter);
+        if (mpErr != null) Lbl(new Rect(240, 652, 800, 44), mpErr, 14, Red, TextAnchor.MiddleCenter);
         if (Btn(new Rect(90, 652, 130, 44), "Back", false, !mpBusy)) Go(Phase.Menu);
     }
 
@@ -242,26 +243,26 @@ public partial class Verdict
     {
         if (hero != null) GUI.DrawTexture(new Rect(0, 0, W, H), hero, ScaleMode.ScaleAndCrop, false, 0, A(Color.white, 0.12f), 0, 0);
         var p = new Rect(290, 110, 700, 500);
-        PanelBox(p, "ROOM CREATED");
+        PanelBox(p, "Room Created");
         float x = p.x + 40, w = p.width - 80;
-        Txt(new Rect(p.x, p.y + 56, p.width, 20), "ROOM CODE", 12, Muted, TextAnchor.MiddleCenter, FontStyle.Bold);
-        Txt(new Rect(p.x, p.y + 80, p.width, 100), string.Join(" ", mpCode.ToCharArray()), 76, Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
-        Txt(new Rect(x, p.y + 196, w, 50), "Ask the other player to open this same link, click MULTIPLAYER and enter the code:", 17, Ink, TextAnchor.MiddleCenter);
-        Txt(new Rect(x, p.y + 250, w, 26), Base, 16, Accent, TextAnchor.MiddleCenter, FontStyle.Italic);
+        TagR(new Rect(p.x, p.y + 58, p.width, 16), "Room Code", Muted, TextAnchor.MiddleCenter);
+        Lbl(new Rect(p.x, p.y + 80, p.width, 100), string.Join(" ", mpCode.ToCharArray()), 72, Gold, TextAnchor.MiddleCenter, true);
+        Txt(new Rect(x, p.y + 196, w, 50), "Ask the other player to open this same link, choose Multiplayer and enter the code:", 17, Ink, TextAnchor.MiddleCenter);
+        Lbl(new Rect(x, p.y + 250, w, 26), Base, 15, Sub, TextAnchor.MiddleCenter);
         Box(new Rect(x, p.y + 300, w, 1), Line);
         Txt(new Rect(x, p.y + 318, w, 26), "You play the " + Side(mpRole) + "   \u00b7   " + mpCase.title + " (" + mpCase.charge + ")", 15, Ink, TextAnchor.MiddleCenter);
-        Txt(new Rect(x, p.y + 352, w, 26), "Waiting for the other player" + Dots, 15, Muted, TextAnchor.MiddleCenter, FontStyle.Italic);
+        Lbl(new Rect(x, p.y + 352, w, 26), "Waiting for the other player" + Dots, 14, Muted, TextAnchor.MiddleCenter);
         if (Btn(new Rect(p.center.x - 90, p.yMax - 76, 180, 46), "Cancel", false)) MpLeave();
     }
 
     void MpBriefButtons()
     {
         bool ready = rs != null && rs.myReady;
-        if (Btn(new Rect(760, 600, 300, 52), ready ? "WAITING..." : "I'M READY", true, !ready && !mpBusy && rs != null)) { MpAct("ready"); Play("select"); }
+        if (Btn(new Rect(760, 600, 300, 52), ready ? "Waiting..." : "I'm Ready", true, !ready && !mpBusy && rs != null)) { MpAct("ready"); Play("select"); }
         if (Btn(new Rect(1076, 600, 134, 52), "Leave", false)) MpLeave();
         string note = ready ? "Waiting for the " + Side(Opp).ToLower() + " to be ready" + Dots
             : rs != null && rs.oppReady ? "The " + Side(Opp).ToLower() + " is ready." : "You play the " + Side(mpRole) + "   \u00b7   room " + mpCode;
-        Txt(new Rect(760, 662, 450, 22), note, 13, Accent, TextAnchor.MiddleLeft);
+        Lbl(new Rect(760, 662, 450, 22), note, 13, Sub, TextAnchor.MiddleLeft);
     }
 
     void InfoPanel(Rect r, string label, string title, string body)
@@ -269,8 +270,8 @@ public partial class Verdict
         Box(r, Panel, 12);
         Border(r, Line, 1, 12);
         float x = r.x + 26, w = r.width - 52;
-        Txt(new Rect(x, r.y + 18, w, 18), label, 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
-        float y = Para(x, r.y + 48, w, title, 26, Ink, FontStyle.Bold, 10);
+        Tag(x, r.y + 18, label, Sub);
+        float y = Para(x, r.y + 48, w, title, 25, Ink, FontStyle.Bold, 10);
         Para(x, y, w, body, 15, Muted);
     }
 
@@ -288,7 +289,7 @@ public partial class Verdict
                 if (IsPros)
                 {
                     InfoPanel(center, "YOUR TURN", "Choose an accusation", "Pick one of your " + rs.pCount + " prosecution cards below. A point the defence cannot rebut costs it its full weight. The defence holds " + rs.dCount + " law cards.");
-                    if (Btn(new Rect(490, 414, 300, 42), "PRESS THIS ACCUSATION", true, mpSel != null && !mpBusy)) { MpAct("move", moveId: mpSel); mpSel = null; Play("gavel", 0.7f); }
+                    if (Btn(new Rect(490, 414, 300, 42), "Press This Accusation", true, mpSel != null && !mpBusy)) { MpAct("move", moveId: mpSel); mpSel = null; Play("gavel", 0.7f); }
                 }
                 else InfoPanel(center, "THE PROSECUTION IS PREPARING", "Waiting for the accusation" + Dots, "Study your cards meanwhile: the best answer rebuts the exact point the prosecutor makes.");
                 break;
@@ -296,11 +297,11 @@ public partial class Verdict
             {
                 var mv = MoveById(rs.move);
                 if (mv != null) MovePanel(center, mv);
-                if (IsPros) Txt(new Rect(340, 380, 600, 20), "The defence is choosing its answer" + Dots, 13, Muted, TextAnchor.MiddleCenter, FontStyle.Italic);
+                if (IsPros) Lbl(new Rect(340, 380, 600, 20), "The defence is choosing its answer" + Dots, 13, Muted, TextAnchor.MiddleCenter);
                 else
                 {
-                    Txt(new Rect(340, 380, 600, 20), "Pick up to 2 cards that rebut this exact point. Weak law backfires.", 13, Accent, TextAnchor.MiddleCenter);
-                    if (Btn(new Rect(520, 414, 240, 42), "PRESENT " + selected.Count + " / " + MaxPick + " CARDS", true, selected.Count > 0 && !mpBusy))
+                    Lbl(new Rect(340, 380, 600, 20), "Pick up to 2 cards that rebut this exact point. Weak law backfires.", 13, Sub, TextAnchor.MiddleCenter);
+                    if (Btn(new Rect(520, 414, 240, 42), "Present " + selected.Count + " / " + MaxPick + " Cards", true, selected.Count > 0 && !mpBusy))
                     {
                         MpAct("defend", cards: selected.ToList());
                         selected.Clear();
@@ -314,8 +315,8 @@ public partial class Verdict
                 DrawReactions(center, age);
                 if (age > 0.4f + reactions.Count * 0.55f)
                 {
-                    if (rs.myReady) Txt(new Rect(340, 424, 600, 22), "Waiting for the other side" + Dots, 13, Muted, TextAnchor.MiddleCenter, FontStyle.Italic);
-                    else if (Btn(new Rect(520, 414, 240, 42), rs.round + 1 < Rounds ? "NEXT ROUND" : "CLOSING ARGUMENTS", true, !mpBusy)) MpAct("ready");
+                    if (rs.myReady) Lbl(new Rect(340, 424, 600, 22), "Waiting for the other side" + Dots, 13, Muted, TextAnchor.MiddleCenter);
+                    else if (Btn(new Rect(520, 414, 240, 42), rs.round + 1 < Rounds ? "Next Round" : "Closing Arguments", true, !mpBusy)) MpAct("ready");
                 }
                 break;
             }
@@ -339,17 +340,18 @@ public partial class Verdict
             bool h = active && Hover(baseR);
             var r = baseR; r.y -= sel ? 16 : h ? 6 : 0;
             float dim = active ? 1 : 0.45f;
-            Box(r, sel ? Hex("2A2A2E") : Panel2, 6);
-            Border(r, sel ? Accent : h ? Muted : Line, sel ? 2f : 1, 6);
+            Box(r, sel ? Hex("242C42") : Panel2, 10);
+            Border(r, sel ? Gold : h ? Sub : Line, sel ? 2f : 1, 10);
             Box(new Rect(r.x + 1, r.y + 1, r.width - 2, 4), A(Red, dim), 2);
             float x = r.x + 14, w = r.width - 28;
-            Txt(new Rect(x, r.y + 14, w, 16), "ACCUSATION", 10, A(Red, dim), TextAnchor.UpperLeft, FontStyle.Bold);
-            Txt(new Rect(x, r.y + 14, w, 16), "-" + m.power + "%", 10, A(Muted, dim), TextAnchor.UpperRight, FontStyle.Bold);
+            Lbl(new Rect(x, r.y + 14, w, 16), Spaced("Accusation"), 10, A(Red, dim), TextAnchor.UpperLeft, true);
+            Lbl(new Rect(x, r.y + 14, w, 16), "-" + m.power + "%", 10, A(Muted, dim), TextAnchor.UpperRight, true);
             float y = Para(x, r.y + 34, w, m.title, 15, A(Ink, dim), FontStyle.Bold, 6);
-            y = Para(x, y, w, m.law, 11, A(Accent, dim), FontStyle.Normal, 10);
+            Lbl(new Rect(x, y, w, 14), m.law, 11, A(Sub, dim));
+            y += 16;
             Box(new Rect(x, y, w, 1), Line);
-            Para(x, y + 10, w, "\"" + m.text + "\"", 12, A(Muted, dim), FontStyle.Italic);
-            if (sel) Txt(new Rect(r.x, r.yMax - 22, r.width, 18), "SELECTED", 10, Accent, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Para(x, y + 10, w, "“" + m.text + "”", 12, A(Muted, dim), FontStyle.Italic);
+            if (sel) TagR(new Rect(r.x, r.yMax - 22, r.width, 16), "Selected", Gold, TextAnchor.MiddleCenter);
             if (h && e.type == EventType.MouseDown && e.button == 0) { mpSel = sel ? null : m.id; Play("select"); e.Use(); }
         }
     }
@@ -360,41 +362,42 @@ public partial class Verdict
         TopBar();
         bool acquit = meter >= Threshold;
         var v = rs.verdict;
-        Txt(new Rect(0, 62, W, 70), acquit ? "NOT GUILTY" : "GUILTY", 56, acquit ? Green : Red, TextAnchor.MiddleCenter, FontStyle.Bold);
-        Txt(new Rect(0, 130, W, 22), (acquit ? "The defence wins." : "The prosecution wins.") + "   You played the " + Side(mpRole).ToLower() + (MpWon ? " - well argued." : " - see what the judge says below."), 16, Muted, TextAnchor.MiddleCenter);
-        DrawMeter(new Rect(340, 166, 600, 70));
+        Scales(new Rect(W / 2 - 16, 58, 32, 36), A(acquit ? Green : Red, 0.8f), 1.5f);
+        Txt(new Rect(0, 100, W, 60), acquit ? "Not Guilty" : "Guilty", 46, acquit ? Green : Red, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Lbl(new Rect(0, 152, W, 20), (acquit ? "The defence wins." : "The prosecution wins.") + "  You played the " + Side(mpRole).ToLower() + (MpWon ? " - well argued." : " - see the judge's notes below."), 14, Muted, TextAnchor.MiddleCenter);
+        DrawMeter(new Rect(340, 176, 600, 70));
 
-        var l = new Rect(60, 250, 570, 400);
-        PanelBox(l, "THE JUDGE ON THE CLOSING ARGUMENTS");
+        var l = new Rect(60, 260, 570, 390);
+        PanelBox(l, "The Judge on the Closing Arguments");
         float x = l.x + 24, w = l.width - 48;
         if (v != null && !string.IsNullOrEmpty(v.headline))
         {
             var col = v.score > 0 ? Green : v.score < 0 ? Red : Muted;
-            Box(new Rect(x, l.y + 44, 64, 34), A(col, 0.18f), 6);
-            Txt(new Rect(x, l.y + 44, 64, 34), Signed(v.score) + "%", 17, col, TextAnchor.MiddleCenter, FontStyle.Bold);
-            float y = Para(x + 80, l.y + 48, w - 80, v.headline, 18, Ink, FontStyle.Bold, 14);
+            Box(new Rect(x, l.y + 44, 60, 32), A(col, 0.16f), 6);
+            Lbl(new Rect(x, l.y + 44, 60, 32), Signed(v.score) + "%", 16, col, TextAnchor.MiddleCenter, true);
+            float y = Para(x + 76, l.y + 48, w - 76, v.headline, 18, Ink, FontStyle.Bold, 14);
             y = Mathf.Max(y, l.y + 96);
-            Txt(new Rect(x, y, w, 18), "DEFENCE", 11, Green, TextAnchor.UpperLeft, FontStyle.Bold);
+            Tag(x, y, "Defence", Green);
             y = Para(x, y + 20, w, v.defence, 14, Ink, FontStyle.Normal, 16);
-            Txt(new Rect(x, y, w, 18), "PROSECUTION", 11, Red, TextAnchor.UpperLeft, FontStyle.Bold);
+            Tag(x, y, "Prosecution", Red);
             Para(x, y + 20, w, v.prosecution, 14, Ink);
         }
 
-        var r = new Rect(650, 250, 570, 400);
-        PanelBox(r, "WHAT YOU LEARNED");
+        var r = new Rect(650, 260, 570, 390);
+        PanelBox(r, "What You Learned");
         x = r.x + 24; w = r.width - 48;
-        float y2 = Para(x, r.y + 44, w, v != null && !string.IsNullOrEmpty(v.lesson) ? v.lesson : cs.takeaway, 16, Accent, FontStyle.Bold, 14);
+        float y2 = Para(x, r.y + 44, w, v != null && !string.IsNullOrEmpty(v.lesson) ? v.lesson : cs.takeaway, 16, Sub, FontStyle.Bold, 14);
         foreach (var c in played)
         {
             Box(new Rect(x, y2 + 5, 8, 8), c.power > 0 ? Green : Red, 4);
             y2 = Para(x + 18, y2, w - 18, c.name + " (" + c.law + "): " + c.lesson, 12, Ink, FontStyle.Normal, 6);
         }
 
-        if (Btn(new Rect(W / 2 - 390, 664, 240, 44), "NEW ROOM", false)) { MpLeave(); OpenLobby(); }
+        if (Btn(new Rect(W / 2 - 390, 664, 240, 44), "New Room", false)) { MpLeave(); OpenLobby(); }
         var rp = rs.report;
         bool rpReady = rp != null && !string.IsNullOrEmpty(rp.summary);
         ReportBtn(new Rect(W / 2 - 130, 664, 260, 44), rpReady || (rp != null && !string.IsNullOrEmpty(rp.error)) ? rp : null, !rpReady && (rp == null || string.IsNullOrEmpty(rp.error)));
-        if (Btn(new Rect(W / 2 + 150, 664, 240, 44), "MAIN MENU", true)) MpLeave();
+        if (Btn(new Rect(W / 2 + 10 + 140, 664, 240, 44), "Main Menu", true)) MpLeave();
     }
 
     void MpBanner()
@@ -402,6 +405,6 @@ public partial class Verdict
         if (rs == null || phase == Phase.Lobby || phase == Phase.MpWait || phase == Phase.MpEnd) return;
         if (!rs.left && !rs.away) return;
         Box(new Rect(0, 52, W, 22), A(Red, 0.35f));
-        Txt(new Rect(0, 52, W, 22), rs.left ? "The other player left the room." : "The other player seems disconnected - waiting for them" + Dots, 12, Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Lbl(new Rect(0, 52, W, 22), rs.left ? "The other player left the room." : "The other player seems disconnected - waiting for them" + Dots, 12, Ink, TextAnchor.MiddleCenter, true);
     }
 }

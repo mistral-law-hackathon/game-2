@@ -38,52 +38,18 @@ public partial class Verdict
     void ReportBtn(Rect r, Report rep, bool loading)
     {
         bool ok = rep != null && !string.IsNullOrEmpty(rep.summary);
-        string label = loading ? "PREPARING ANALYSIS" + Dots : ok ? "FULL CASE ANALYSIS" : "ANALYSIS UNAVAILABLE";
-        if (ok) Box(Grow(r, 2 + 1.5f * Mathf.Sin(Time.time * 3)), A(Brass, 0.22f), 7);
+        string label = loading ? "Preparing Analysis" + Dots : ok ? "Full Case Analysis" : "Analysis Unavailable";
+        if (ok) Box(Grow(r, 2 + 1.5f * Mathf.Sin(Time.time * 3)), A(Gold, 0.22f), 7);
         if (Btn(r, label, false, ok))
         {
             shownReport = rep; reportBack = phase; repScroll = Vector2.zero;
             phase = Phase.Report; phaseT = 0;
             Play("select");
         }
-        if (ok) Border(r, A(Brass, 0.8f), 1, 4);
+        if (ok) Border(r, A(Gold, 0.8f), 1, 8);
     }
 
     // ---------- law-themed helpers ----------
-    void LineSeg(Vector2 a, Vector2 b, float w, Color c)
-    {
-        var m = GUI.matrix;
-        float ang = Mathf.Atan2(b.y - a.y, b.x - a.x) * Mathf.Rad2Deg;
-        GUIUtility.RotateAroundPivot(ang, a);
-        Box(new Rect(a.x, a.y - w / 2, Vector2.Distance(a, b), w), c, w / 2);
-        GUI.matrix = m;
-    }
-
-    // scales of justice, drawn from primitives; s = overall height
-    void Scales(Vector2 c, float s, Color col, float sway = 1)
-    {
-        float t = Mathf.Sin(Time.time * 0.9f) * 4 * sway * Mathf.Deg2Rad;
-        float lw = Mathf.Max(1.2f, s * 0.035f);
-        var top = new Vector2(c.x, c.y - s * 0.38f);
-        Box(new Rect(c.x - lw / 2, top.y, lw, s * 0.82f), col);
-        Box(new Rect(c.x - s * 0.22f, c.y + s * 0.42f, s * 0.44f, lw * 1.6f), col, lw * 0.8f);
-        Box(new Rect(c.x - s * 0.07f, c.y + s * 0.36f, s * 0.14f, lw * 1.6f), col, lw * 0.8f);
-        float k = s * 0.065f;
-        Box(new Rect(c.x - k, top.y - k * 2.1f, k * 2, k * 2), col, k);
-        var dir = new Vector2(Mathf.Cos(t), Mathf.Sin(t)) * s * 0.46f;
-        var l = top - dir; var r = top + dir;
-        LineSeg(l, r, lw, col);
-        foreach (var e in new[] { l, r })
-        {
-            var pan = new Vector2(e.x, e.y + s * 0.34f);
-            LineSeg(e, pan + new Vector2(-s * 0.15f, 0), lw * 0.6f, col);
-            LineSeg(e, pan + new Vector2(s * 0.15f, 0), lw * 0.6f, col);
-            Box(new Rect(pan.x - s * 0.17f, pan.y - lw * 0.5f, s * 0.34f, s * 0.07f), col, s * 0.035f);
-        }
-    }
-
-    void Watermark() => Scales(new Vector2(W - 150, H - 230), 340, A(Brass, 0.035f), 0.3f);
-
     // seal-style badge: big value + small label in a double ring
     void Seal(Vector2 c, float d, string big, string small, Color col)
     {
@@ -91,8 +57,8 @@ public partial class Verdict
         Box(r, A(col, 0.08f), d / 2);
         Border(r, A(col, 0.85f), 1.5f, d / 2);
         Border(Grow(r, -6), A(col, 0.35f), 1, d / 2 - 6);
-        Txt(new Rect(r.x, r.y + d * 0.2f, d, d * 0.4f), big, Mathf.RoundToInt(Mathf.Min(d * 0.26f, d * 1.25f / Mathf.Max(1, big.Length))), col, TextAnchor.MiddleCenter, FontStyle.Bold);
-        Txt(new Rect(r.x + 8, r.y + d * 0.58f, d - 16, d * 0.2f), small, 10, A(col, 0.9f), TextAnchor.MiddleCenter, FontStyle.Bold);
+        Lbl(new Rect(r.x, r.y + d * 0.2f, d, d * 0.4f), big, Mathf.RoundToInt(Mathf.Min(d * 0.25f, d * 1.2f / Mathf.Max(1, big.Length))), col, TextAnchor.MiddleCenter, true);
+        Lbl(new Rect(r.x + 8, r.y + d * 0.58f, d - 16, d * 0.2f), small, 9, A(col, 0.9f), TextAnchor.MiddleCenter, true);
     }
 
     // wrapped text with generous line spacing (IMGUI has no line-height setting)
@@ -120,13 +86,13 @@ public partial class Verdict
     {
         Box(r, A(c, 0.12f), r.height / 2);
         Border(r, A(c, 0.7f), 1, r.height / 2);
-        Txt(r, s, 11, c, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Lbl(r, s, 10, c, TextAnchor.MiddleCenter, true);
     }
 
     float Head(float x, float y, float w, string label, int count = -1)
     {
-        Txt(new Rect(x, y, w, 18), "\u00a7  " + label, 12, Brass, TextAnchor.UpperLeft, FontStyle.Bold);
-        Box(new Rect(x, y + 26, w, 1), A(Brass, 0.25f));
+        Box(new Rect(x, y, w, 1), Line);
+        Tag(x, y + 12, label, Sub, w);
         return y + 42;
     }
 
@@ -147,12 +113,8 @@ public partial class Verdict
         }
         yy = ParaLines(tx, yy, tw, it.body, 14, Hex("C4C4C0"), FontStyle.Normal, 1.7f, 12);
         var card = new Rect(x, y0, w, yy - y0);
-        if (Event.current.type == EventType.Repaint)
-        {
-            // drawn after measuring, so paint the card behind by re-drawing text on top
-        }
         Box(new Rect(x, y0, 3, card.height), rail, 1.5f);
-        if (pw > 0) Pill(new Rect(x + w - pw - 4, y0 + 14, pw, 22), it.src, Brass);
+        if (pw > 0) Pill(new Rect(x + w - pw - 4, y0 + 14, pw, 22), it.src, Sub);
         return yy + 14;
     }
 
@@ -161,9 +123,9 @@ public partial class Verdict
         var rep = shownReport;
         TopBar();
         bool acquit = meter >= Threshold;
-        Scales(new Vector2(92, 104), 52, Brass);
-        Txt(new Rect(136, 66, 600, 44), "Case analysis", 32, Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
-        Txt(new Rect(138, 108, 640, 22), "Mistral AI debrief, grounded in a French criminal law reference", 14, Muted, TextAnchor.MiddleLeft, FontStyle.Italic);
+        Scales(new Rect(68, 78, 40, 46), A(Gold, 0.9f), 2);
+        Txt(new Rect(126, 66, 600, 44), "Case Analysis", 30, Ink, TextAnchor.MiddleLeft, FontStyle.Bold);
+        Lbl(new Rect(128, 108, 640, 20), "Mistral AI debrief, grounded in a French criminal law reference", 12, Muted, TextAnchor.MiddleLeft);
 
         if (rep != null)
         {
@@ -174,7 +136,7 @@ public partial class Verdict
         }
 
         var view = new Rect(60, 156, W - 120, 494);
-        Box(new Rect(60, 154, W - 120, 1), A(Brass, 0.3f));
+        
         var ev = Event.current;
         if (ev.type == EventType.ScrollWheel && view.Contains(ev.mousePosition))
         {
@@ -201,7 +163,7 @@ public partial class Verdict
                 foreach (var t in rep.nextTime)
                 {
                     if (string.IsNullOrEmpty(t)) continue;
-                    Txt(new Rect(0, ly, 30, 26), (n++).ToString(), 20, Brass, TextAnchor.MiddleLeft, FontStyle.Bold);
+                    Lbl(new Rect(0, ly, 30, 26), (n++).ToString("00"), 16, Muted, TextAnchor.MiddleLeft);
                     ly = ParaLines(30, ly, lw - 30, t, 15, Ink, FontStyle.Normal, 1.7f, 10);
                 }
             }
@@ -215,7 +177,7 @@ public partial class Verdict
             if (rep.precedents != null && rep.precedents.Count > 0)
             {
                 ry = Head(rx, ry, rw, "WHAT IF THE FACTS CHANGED");
-                foreach (var it in rep.precedents) ry = ItemCard(rx, ry, rw, it, Brass);
+                foreach (var it in rep.precedents) ry = ItemCard(rx, ry, rw, it, Sub);
                 ry += 12;
             }
             if (rep.sources != null && rep.sources.Count > 0)
@@ -229,9 +191,9 @@ public partial class Verdict
         repH = Mathf.Max(ly, ry) + 20;
         if (repH > view.height && repScroll.y < repH - view.height - 10)
         {
-            GUI.DrawTexture(new Rect(view.x, view.yMax - 50, view.width, 50), grad, ScaleMode.StretchToFill, true, 0, Color.white, 0, 0);
-            Txt(new Rect(view.x, view.yMax - 20, view.width - 24, 18), "scroll for more  \u2193", 11, Muted, TextAnchor.MiddleRight, FontStyle.Italic);
+            GUI.DrawTexture(new Rect(view.x, view.yMax - 50, view.width, 50), grad, ScaleMode.StretchToFill, true, 0, Bg, 0, 0);
+            Lbl(new Rect(view.x, view.yMax - 20, view.width - 24, 18), "Scroll for more  \u2193", 11, Muted, TextAnchor.MiddleRight);
         }
-        if (Btn(new Rect(W / 2 - 150, 664, 300, 44), "BACK TO THE VERDICT", true)) { phase = reportBack; Play("select"); }
+        if (Btn(new Rect(W / 2 - 150, 664, 300, 44), "Back to the Verdict", true)) { phase = reportBack; Play("select"); }
     }
 }
