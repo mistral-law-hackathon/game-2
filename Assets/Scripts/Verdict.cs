@@ -4,11 +4,11 @@ using System.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
 
-public class Verdict : MonoBehaviour
+public partial class Verdict : MonoBehaviour
 {
     const float W = 1280, H = 720;
     const int Threshold = 60, MaxPick = 2;
-    enum Phase { Loading, Menu, Create, Scene, Brief, Trial, Closing, Judging, End }
+    enum Phase { Loading, Menu, Create, Scene, Brief, Trial, Closing, Judging, End, Lobby, MpWait, MpTrial, MpEnd }
     enum Mic { Idle, Starting, Recording, Busy }
 #if UNITY_WEBGL && !UNITY_EDITOR
     [System.Runtime.InteropServices.DllImport("__Internal")] static extern void MicStart(string go);
@@ -578,7 +578,12 @@ public class Verdict : MonoBehaviour
             case Phase.Closing: DrawClosing(); break;
             case Phase.Judging: DrawJudging(); break;
             case Phase.End: DrawEnd(); break;
+            case Phase.Lobby: DrawLobby(); break;
+            case Phase.MpWait: DrawMpWait(); break;
+            case Phase.MpTrial: DrawMpTrial(); break;
+            case Phase.MpEnd: DrawMpEnd(); break;
         }
+        if (mp) MpBanner();
     }
 
     void DrawLoading()
@@ -599,7 +604,7 @@ public class Verdict : MonoBehaviour
         Box(new Rect(W / 2 + 90, 130, 140, 1), Line);
         Txt(new Rect(0, 120, W, 20), "THE AI COURTROOM", 11, Muted, TextAnchor.MiddleCenter, FontStyle.Bold);
         Txt(new Rect(0, 152, W, 30), "You are the defence lawyer. Answer the prosecution with real law, then convince the jury.", 18, Ink, TextAnchor.MiddleCenter);
-        Txt(new Rect(0, 182, W, 24), "French criminal law in ten minutes  \u00b7  closing arguments judged live by Mistral AI", 14, Muted, TextAnchor.MiddleCenter, FontStyle.Italic);
+        Txt(new Rect(0, 182, W, 24), "French criminal law in ten minutes  \u00b7  win " + Threshold + "%+ of the jury  \u00b7  closing arguments judged live by Mistral AI", 14, Muted, TextAnchor.MiddleCenter, FontStyle.Italic);
 
         float tw = 360, gap = 30, x0 = (W - (3 * tw + 2 * gap)) / 2;
         for (int i = 0; i < content.cases.Count && i < 3; i++)
@@ -630,10 +635,12 @@ public class Verdict : MonoBehaviour
             Box(new Rect(r.x + 60, r.y + 14, 1, r.height - 28), Line);
             Txt(new Rect(r.x + 76, r.y + 6, r.width - 90, r.height - 12), steps[i], 13, Ink, TextAnchor.MiddleLeft);
         }
-        Txt(new Rect(x0, 670, 360, 34), "Goal: " + Threshold + "%+ of the jury votes NOT GUILTY.", 13, Muted, TextAnchor.MiddleLeft, FontStyle.Italic);
-        var cr = new Rect(W / 2 - 210, 666, 420, 40);
+        var cr = new Rect(W / 2 - 430, 666, 420, 40);
         if (Btn(cr, "+   CREATE A CASE FROM YOUR OWN STORY", false)) { genErr = null; Go(Phase.Create); }
         Border(cr, A(Accent, 0.55f), 1, 4);
+        var mr = new Rect(W / 2 + 10, 666, 420, 40);
+        if (Btn(mr, "MULTIPLAYER  -  PROSECUTION VS DEFENCE", false)) OpenLobby();
+        Border(mr, A(Accent, 0.55f), 1, 4);
         if (Btn(new Rect(W - 160, 670, 120, 34), voiceOn ? "VOICE: ON" : "VOICE: OFF", false)) { voiceOn = !voiceOn; Hush(); }
     }
 
@@ -679,7 +686,7 @@ public class Verdict : MonoBehaviour
         var left = new Rect(70, 60, 640, 600);
         Txt(new Rect(left.x, left.y, 400, 20), "CASE FILE  -  " + CaseLabel, 13, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
         float y = Para(left.x, left.y + 28, left.width, cs.title, 44, Ink, FontStyle.Bold, 8);
-        y = Para(left.x, y, left.width, "Your client: " + cs.client, 18, Muted, FontStyle.Normal, 26);
+        y = Para(left.x, y, left.width, (IsPros ? "The accused: " : "Your client: ") + cs.client, 18, Muted, FontStyle.Normal, 26);
         Txt(new Rect(left.x, y, 300, 20), "THE FACTS", 13, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
         y += 30;
         foreach (var f in cs.facts)
@@ -697,16 +704,20 @@ public class Verdict : MonoBehaviour
         Box(new Rect(x, y, w, 1), Line);
         y += 18;
         Txt(new Rect(x, y, w, 20), "YOUR OBJECTIVE", 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
-        y = Para(x, y + 26, w, "The jury starts at " + cs.start + "% Not guilty. Bring it to " + Threshold + "% or more.", 17, Ink, FontStyle.Bold, 10);
-        y = Para(x, y, w, "3 rounds: the prosecution makes a point, you answer with up to 2 cards. Then you deliver your closing argument.", 15, Muted, FontStyle.Normal, 22);
+        y = Para(x, y + 26, w, BriefGoal, 17, Ink, FontStyle.Bold, 10);
+        y = Para(x, y, w, BriefHow, 15, Muted, FontStyle.Normal, 22);
         if (caseIdx >= 3)
         {
             Box(new Rect(x, y, w, 1), Line);
             Para(x, y + 16, w, "This case was written by Mistral AI from your description. Treat its legal details as a learning aid, not legal advice.", 13, Muted, FontStyle.Italic);
         }
 
-        if (Btn(new Rect(760, 600, 300, 52), "ENTER THE COURTROOM", true)) { Go(Phase.Trial); resolved = false; Play("gavel"); SpeakMove(); }
-        if (Btn(new Rect(1076, 600, 134, 52), "Back", false)) Go(Phase.Menu);
+        if (mp) MpBriefButtons();
+        else
+        {
+            if (Btn(new Rect(760, 600, 300, 52), "ENTER THE COURTROOM", true)) { Go(Phase.Trial); resolved = false; Play("gavel"); SpeakMove(); }
+            if (Btn(new Rect(1076, 600, 134, 52), "Back", false)) Go(Phase.Menu);
+        }
         if (Btn(new Rect(70, 600, 240, 52), "REPLAY THE FACTS", false)) PlayScene();
     }
 
@@ -716,8 +727,9 @@ public class Verdict : MonoBehaviour
         Box(new Rect(0, 52, W, 1), Line);
         Txt(new Rect(24, 0, 200, 52), "VERDICT", 20, Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
         Txt(new Rect(0, 0, W, 52), cs.title + "   |   " + cs.charge + " (" + cs.law + ")", 15, Ink, TextAnchor.MiddleCenter);
-        string right = phase == Phase.Trial ? "ROUND " + (round + 1) + " / " + cs.moves.Count : phase == Phase.End ? "JUDGMENT" : "CLOSING";
-        Txt(new Rect(W - 224, 0, 200, 52), right, 15, Accent, TextAnchor.MiddleRight, FontStyle.Bold);
+        string right = (phase == Phase.Trial || phase == Phase.MpTrial ? "ROUND " + (round + 1) + " / " + Rounds : phase == Phase.End || phase == Phase.MpEnd ? "JUDGMENT" : "CLOSING")
+            + (mp ? "   \u00b7   " + Side(mpRole) : "");
+        Txt(new Rect(W - 424, 0, 400, 52), right, 15, Accent, TextAnchor.MiddleRight, FontStyle.Bold);
     }
 
     void DrawMeter(Rect r)
@@ -777,15 +789,7 @@ public class Verdict : MonoBehaviour
         var center = new Rect(340, 164, 600, 200);
         if (!resolved)
         {
-            Box(center, Panel, 12);
-            Border(center, A(Red, 0.6f), 1.5f, 12);
-            Box(new Rect(center.x, center.y + 14, 4, center.height - 28), Red, 2);
-            float x = center.x + 26, w = center.width - 52;
-            Txt(new Rect(x, center.y + 18, w, 18), "THE PROSECUTION ARGUES", 12, Red, TextAnchor.UpperLeft, FontStyle.Bold);
-            Txt(new Rect(x, center.y + 18, w, 18), mv.law, 12, Muted, TextAnchor.UpperRight);
-            float y = Para(x, center.y + 48, w, mv.title, 26, Ink, FontStyle.Bold, 10);
-            Para(x, y, w, "\"" + mv.text + "\"", 17, Ink, FontStyle.Italic);
-            Txt(new Rect(x, center.yMax - 36, w, 20), "If you don't answer it: " + Signed(-mv.power) + "% jury", 14, Red, TextAnchor.UpperLeft, FontStyle.Bold);
+            MovePanel(center, mv);
 
             string hint = round == 0
                 ? "Pick up to 2 cards that rebut this exact point. Weak law backfires."
@@ -796,6 +800,27 @@ public class Verdict : MonoBehaviour
         else
         {
             float age = Time.time - resolveT;
+            DrawReactions(center, age);
+            if (age > 0.4f + reactions.Count * 0.55f && Btn(new Rect(520, 414, 240, 42), round + 1 < cs.moves.Count ? "NEXT ROUND" : "CLOSING ARGUMENT", true)) NextRound();
+        }
+        DrawHand();
+    }
+
+    void MovePanel(Rect center, MoveDef mv)
+    {
+            Box(center, Panel, 12);
+            Border(center, A(Red, 0.6f), 1.5f, 12);
+            Box(new Rect(center.x, center.y + 14, 4, center.height - 28), Red, 2);
+            float x = center.x + 26, w = center.width - 52;
+            Txt(new Rect(x, center.y + 18, w, 18), "THE PROSECUTION ARGUES", 12, Red, TextAnchor.UpperLeft, FontStyle.Bold);
+            Txt(new Rect(x, center.y + 18, w, 18), mv.law, 12, Muted, TextAnchor.UpperRight);
+            float y = Para(x, center.y + 48, w, mv.title, 26, Ink, FontStyle.Bold, 10);
+            Para(x, y, w, "\"" + mv.text + "\"", 17, Ink, FontStyle.Italic);
+            Txt(new Rect(x, center.yMax - 36, w, 20), (IsPros ? "If the defence can't answer it: " : "If you don't answer it: ") + Signed(-mv.power) + "% jury", 14, Red, TextAnchor.UpperLeft, FontStyle.Bold);
+    }
+
+    void DrawReactions(Rect center, float age)
+    {
             Txt(new Rect(center.x, center.y - 6, center.width, 20), "THE JURY REACTS", 12, Accent, TextAnchor.UpperLeft, FontStyle.Bold);
             float y = center.y + 20;
             for (int i = 0; i < reactions.Count; i++)
@@ -814,9 +839,6 @@ public class Verdict : MonoBehaviour
                 Txt(new Rect(row.x + 82, row.y + 26, row.width - 96, bh), re.body, 13, A(Muted, a));
                 y += row.height + 10;
             }
-            if (age > 0.4f + reactions.Count * 0.55f && Btn(new Rect(520, 414, 240, 42), round + 1 < cs.moves.Count ? "NEXT ROUND" : "CLOSING ARGUMENT", true)) NextRound();
-        }
-        DrawHand();
     }
 
     void DrawHand()
@@ -861,19 +883,25 @@ public class Verdict : MonoBehaviour
         var p = new Rect(140, 166, 1000, 530);
         PanelBox(p, "CLOSING ARGUMENT");
         float x = p.x + 30, w = p.width - 60;
-        float y = Para(x, p.y + 44, w, "Address the jury in your own words - type it or speak it.", 26, Ink, FontStyle.Bold, 10);
-        y = Para(x, y, w, "Explain which legal condition of the charge is missing (or which defence applies), link it to the facts and cite the article. Mistral AI plays the judge: a strong closing can swing the jury by up to +15%, a wrong one costs you.", 15, Muted, FontStyle.Normal, 14);
-        y = Para(x, y, w, "Law on your side: " + string.Join("  -  ", played.Where(c => c.power > 0).Select(c => c.name + " (" + c.law + ")")), 13, Accent, FontStyle.Normal, 18);
+        float y = Para(x, p.y + 44, w, ClosingTitle, 26, Ink, FontStyle.Bold, 10);
+        y = Para(x, y, w, (mp ? ClosingHelp : "Explain which legal condition of the charge is missing (or which defence applies), link it to the facts and cite the article. Mistral AI plays the judge: a strong closing can swing the jury by up to +15%, a wrong one costs you."), 15, Muted, FontStyle.Normal, 14);
+        y = Para(x, y, w, (IsPros ? "The defence relied on: " + string.Join("  -  ", played.Select(c => c.name)) : "Law on your side: " + string.Join("  -  ", played.Where(c => c.power > 0).Select(c => c.name + " (" + c.law + ")"))), 13, Accent, FontStyle.Normal, 18);
         var ta = new Rect(x, y, w, p.yMax - y - 80);
         Border(Grow(ta, 1), Line, 1, 8);
         GUI.SetNextControlName("arg");
+        GUI.enabled = !MpSubmitted;
         argument = GUI.TextArea(ta, argument, 1500, area);
+        GUI.enabled = true;
         if (focusArg) { GUI.FocusControl("arg"); if (GUI.GetNameOfFocusedControl() == "arg") focusArg = false; }
         if (string.IsNullOrEmpty(argument))
-            Txt(new Rect(ta.x + 18, ta.y + 16, ta.width - 36, 60), "e.g. \"Members of the jury, theft requires fraudulent intent under article 311-1...\"", 17, A(Muted, 0.6f), TextAnchor.UpperLeft, FontStyle.Italic);
-        Txt(new Rect(x, p.yMax - 60, 360, 44), micErr ?? (argument.Trim().Length < 20 ? "Write or say at least a couple of sentences." : argument.Length + " characters"), 13, micErr != null ? Red : Muted, TextAnchor.MiddleLeft);
-        MicBtn(new Rect(p.xMax - 330 - 16 - 260, p.yMax - 64, 260, 48), false);
-        if (Btn(new Rect(p.xMax - 330, p.yMax - 64, 300, 48), "DELIVER TO THE JURY", true, argument.Trim().Length >= 20)) SubmitClosing();
+            Txt(new Rect(ta.x + 18, ta.y + 16, ta.width - 36, 60), (IsPros ? "e.g. \"Members of the jury, every element of " + cs.law + " is proven...\"" : "e.g. \"Members of the jury, theft requires fraudulent intent under article 311-1...\""), 17, A(Muted, 0.6f), TextAnchor.UpperLeft, FontStyle.Italic);
+        Txt(new Rect(x, p.yMax - 60, 360, 44), micErr ?? (MpSubmitted ? "Delivered. Waiting for the other side's closing" + Dots : argument.Trim().Length < 20 ? "Write or say at least a couple of sentences." : argument.Length + " characters"), 13, micErr != null ? Red : Muted, TextAnchor.MiddleLeft);
+        if (!MpSubmitted) MicBtn(new Rect(p.xMax - 330 - 16 - 260, p.yMax - 64, 260, 48), false);
+        if (Btn(new Rect(p.xMax - 330, p.yMax - 64, 300, 48), "DELIVER TO THE JURY", true, argument.Trim().Length >= 20 && !MpSubmitted && !mpBusy))
+        {
+            if (mp) { Hush(); MpAct("closing", text: argument.Trim()); }
+            else SubmitClosing();
+        }
     }
 
     void DrawCreate()
@@ -923,7 +951,7 @@ public class Verdict : MonoBehaviour
         Box(new Rect(W / 2 - 50, 300, 100, 100), A(Accent, 0.15f + 0.2f * pulse), 50);
         Box(new Rect(W / 2 - 22, 328, 44, 44), Accent, 22);
         Txt(new Rect(0, 430, W, 40), "The judge is deliberating" + new string('.', 1 + (int)(Time.time * 2) % 3), 26, Ink, TextAnchor.MiddleCenter, FontStyle.Bold);
-        Txt(new Rect(0, 474, W, 24), "Mistral AI is weighing your closing argument against the facts and the law", 15, Muted, TextAnchor.MiddleCenter);
+        Txt(new Rect(0, 474, W, 24), mp ? "Mistral AI is weighing both closing arguments against the facts and the law" : "Mistral AI is weighing your closing argument against the facts and the law", 15, Muted, TextAnchor.MiddleCenter);
     }
 
     void DrawEnd()

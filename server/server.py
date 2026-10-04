@@ -1,5 +1,7 @@
 """Serves the WebGL build and proxies Mistral (the AI judge); the API key stays server-side."""
 import hashlib
+import random
+import time
 import json
 import os
 import re
@@ -80,7 +82,7 @@ def tts(voice, text):
 
 
 def prewarm():
-    for c in C.CASES:
+    for c in C.CASES + [{"moves": C.PROSECUTION_EXTRA}]:
         lines = [("narrator", s) for s in c.get("scenes", [])] + [("prosecutor", m["text"]) for m in c["moves"]]
         for v, t in lines:
             try:
@@ -235,6 +237,170 @@ def transcribe(audio, ctype):
         return {"text": str(json.loads(resp.read()).get("text") or "").strip()}
 
 
+# ---------- multiplayer rooms (prosecution vs defence, two browsers, polled state) ----------
+ROOMS = {}
+RLOCK = threading.Lock()
+ROUNDS = 3
+OTHER = {"p": "d", "d": "p"}
+DUEL = """You are the presiding judge in VERDICT, an educational game about FRENCH criminal law for people with no legal background.
+Two players argued a case: a PROSECUTOR and a DEFENCE lawyer. Weigh both closing arguments against the facts and real French law, as a fair judge.
+Reward correct legal reasoning (elements of the offence, defences, burden of proof, linking facts to the article); penalise wrong law, invented facts and empty rhetoric.
+Reply with JSON only: {"score": integer -15..15 (positive = the jury moves toward NOT GUILTY, negative = toward GUILTY), "headline": "max 8 words",
+"defence": "1-2 plain sentences of feedback on the defence closing", "prosecution": "1-2 plain sentences of feedback on the prosecution closing",
+"lesson": "one sentence: the key point of law in this case"}"""
+
+
+def find_case(cid):
+    return CASES.get(cid) or GEN.get(cid)
+
+
+def room_create(d):
+    case = find_case(d.get("caseId"))
+    if not case:
+        return {"error": "Unknown case."}
+    role = "p" if d.get("role") == "p" else "d"
+    now = time.time()
+    mc = dict(case, moves=case["moves"] + C.PROSECUTION_EXTRA)
+    with RLOCK:
+        for k in [k for k, r in ROOMS.items() if now - r["t"] > 4 * 3600]:
+            del ROOMS[k]
+        code = "".join(random.choice("ABCDEFGHJKLMNPQRSTUVWXYZ") for _ in range(4))
+        while code in ROOMS:
+            code = "".join(random.choice("ABCDEFGHJKLMNPQRSTUVWXYZ") for _ in range(4))
+        ids = [c["id"] for c in case["cards"]]
+        ROOMS[code] = {"code": code, "case": mc, "host": role, "phase": "waiting", "round": 0, "meter": case["start"],
+                       "dhand": random.sample(ids, len(ids)), "phand": [m["id"] for m in mc["moves"]], "move": "",
+                       "reactions": [], "record": [], "played": [], "ready": {"p": False, "d": False},
+                       "closing": {"p": "", "d": ""}, "verdict": None, "seen": {role: now, OTHER[role]: now},
+                       "left": {"p": False, "d": False}, "v": 1, "t": now}
+    return {"code": code, "role": role, "caseDef": mc}
+
+
+def room_join(d):
+    code = str(d.get("code") or "").strip().upper()
+    with RLOCK:
+        r = ROOMS.get(code)
+        if not r:
+            return {"error": "No room with this code. Check the 4 letters."}
+        if r["phase"] != "waiting":
+            return {"error": "This room already has two players."}
+        role = OTHER[r["host"]]
+        r["phase"] = "brief"
+        r["seen"][role] = time.time()
+        r["v"] += 1
+        return {"code": code, "role": role, "caseDef": r["case"]}
+
+
+def room_view(r, role):
+    o, now = OTHER[role], time.time()
+    r["seen"][role] = now
+    return {"code": r["code"], "phase": r["phase"], "round": r["round"], "meter": r["meter"], "v": r["v"], "move": r["move"],
+            "reactions": r["reactions"], "record": r["record"], "played": r["played"],
+            "dhand": r["dhand"] if role == "d" else [], "phand": r["phand"] if role == "p" else [],
+            "dCount": len(r["dhand"]), "pCount": len(r["phand"]),
+            "myReady": r["ready"][role], "oppReady": r["ready"][o],
+            "myClosing": bool(r["closing"][role]), "oppClosing": bool(r["closing"][o]),
+            "left": r["left"][o], "away": r["phase"] != "waiting" and now - r["seen"][o] > 12, "verdict": r["verdict"]}
+
+
+def room_state(code, role):
+    with RLOCK:
+        r = ROOMS.get(str(code).upper())
+        return room_view(r, "p" if role == "p" else "d") if r else {"phase": "gone", "error": "This room no longer exists."}
+
+
+def resolve(r, mv, ids):
+    cards = {c["id"]: c for c in r["case"]["cards"]}
+    reactions, names, total, answered = [], [], 0, False
+    for i in ids:
+        c = cards[i]
+        counter = c.get("counters") == mv["id"] or bool(mv.get("kind") and c["kind"] == mv["kind"] and c["power"] > 0)
+        d = c["power"] + (4 if counter else 0)
+        answered |= counter
+        reactions.append({"title": c["name"] + ("  -  directly answers the prosecution" if counter else ""), "body": c["lesson"], "delta": d})
+        total += d
+        names.append(c["name"])
+        r["dhand"].remove(i)
+        r["played"].append(i)
+    if answered:
+        reactions.append({"title": "Prosecution's point neutralised", "delta": 0,
+                          "body": mv.get("lesson") or f'The defence answered "{mv["title"]}" head-on, so it no longer sways the jury.'})
+    else:
+        reactions.append({"title": "Prosecution's point stands: " + mv["title"], "delta": -mv["power"],
+                          "body": "Nothing the defence presented answered it directly. The right card rebuts this exact point."})
+        total -= mv["power"]
+    r["meter"] = max(0, min(100, r["meter"] + total))
+    r["reactions"] = reactions
+    r["record"].append(f'Round {r["round"] + 1}: {mv["title"]} vs {", ".join(names) or "no answer"}|{total}')
+    r["phase"] = "reveal"
+
+
+def duel_judge(r):
+    case = r["case"]
+    cards = {c["id"]: c for c in case["cards"]}
+    try:
+        user = json.dumps({
+            "case": case["title"], "accused": case["client"], "charge": f'{case["charge"]} ({case["law"]})',
+            "legal_definition": case["definition"], "facts": case["facts"], "key_lesson": case["takeaway"],
+            "defence_cards_played": [f'{cards[i]["name"]} ({cards[i]["law"]})' for i in r["played"]],
+            "jury_before_closings": f'{r["meter"]}% not guilty',
+            "prosecution_closing": r["closing"]["p"], "defence_closing": r["closing"]["d"],
+        }, ensure_ascii=False)
+        j = mistral_json(DUEL, user, timeout=40)
+        v = {"score": clamp(j.get("score"), -15, 15, 0), "headline": str(j.get("headline") or "The court has heard both sides")[:70],
+             "defence": str(j.get("defence") or "")[:400], "prosecution": str(j.get("prosecution") or "")[:400],
+             "lesson": str(j.get("lesson") or case["takeaway"])[:300]}
+    except Exception as e:  # offline fallback keeps the demo going
+        print("duel judge fallback:", e)
+        kw = case.get("keywords") or []
+        hd = sum(k in r["closing"]["d"].lower() for k in kw)
+        hp = sum(k in r["closing"]["p"].lower() for k in kw)
+        v = {"score": max(-10, min(10, 3 * (hd - hp))), "headline": "Offline judge",
+             "defence": f"{hd} key legal ideas mentioned.", "prosecution": f"{hp} key legal ideas mentioned.", "lesson": case["takeaway"]}
+    with RLOCK:
+        r["verdict"] = v
+        r["meter"] = max(0, min(100, r["meter"] + v["score"]))
+        r["phase"] = "end"
+        r["v"] += 1
+
+
+def room_act(d):
+    code = str(d.get("code") or "").upper()
+    role = "p" if d.get("role") == "p" else "d"
+    a = d.get("a")
+    with RLOCK:
+        r = ROOMS.get(code)
+        if not r:
+            return {"phase": "gone", "error": "This room no longer exists."}
+        ph, changed = r["phase"], True
+        moves = {m["id"]: m for m in r["case"]["moves"]}
+        if a == "leave":
+            r["left"][role] = True
+        elif a == "ready" and ph in ("brief", "reveal"):
+            r["ready"][role] = True
+            if all(r["ready"].values()):
+                r["ready"] = {"p": False, "d": False}
+                if ph == "reveal":
+                    r["round"] += 1
+                    r["move"], r["reactions"] = "", []
+                r["phase"] = "closing" if r["round"] >= ROUNDS else "prosecute"
+        elif a == "move" and ph == "prosecute" and role == "p" and d.get("moveId") in r["phand"]:
+            r["phand"].remove(d["moveId"])
+            r["move"], r["phase"] = d["moveId"], "defend"
+        elif a == "defend" and ph == "defend" and role == "d":
+            resolve(r, moves[r["move"]], [i for i in dict.fromkeys(d.get("cards") or []) if i in r["dhand"]][:2])
+        elif a == "closing" and ph == "closing" and len(str(d.get("text") or "").strip()) >= 20 and not r["closing"][role]:
+            r["closing"][role] = str(d["text"]).strip()[:2000]
+            if all(r["closing"].values()):
+                r["phase"] = "judging"
+                threading.Thread(target=duel_judge, args=(r,), daemon=True).start()
+        else:
+            changed = False
+        if changed:
+            r["v"] += 1
+        return room_view(r, role)
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(WEB_DIR), **kw)
@@ -251,7 +417,14 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def log_request(self, code="-", size="-"):
+        if not self.path.startswith("/api/room/state"):
+            super().log_request(code, size)
+
     def do_GET(self):
+        if self.path.startswith("/api/room/state"):
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            return self.send_json(room_state(q.get("code", [""])[0], q.get("role", ["d"])[0]))
         if self.path.startswith("/api/content"):
             return self.send_json({"cases": C.CASES})
         if self.path.startswith("/api/tts"):
@@ -279,7 +452,8 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as e:
                 self.log_error("stt error: %r", e)
                 return self.send_json({"error": "Transcription is unavailable right now."}, 503)
-        fn = {"/api/verdict": judge, "/api/generate": generate}.get(self.path)
+        fn = {"/api/verdict": judge, "/api/generate": generate, "/api/room/create": room_create,
+              "/api/room/join": room_join, "/api/room/act": room_act}.get(self.path)
         if not fn:
             return self.send_json({"error": "not found"}, 404)
         try:

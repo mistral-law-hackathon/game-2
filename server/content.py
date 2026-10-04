@@ -146,3 +146,13 @@ SFX = {"theft": ["store", "cctv", "alarm+siren"], "trust": ["store", "typing", "
 for _c in CASES:
     _c.setdefault("look", _c["id"])
     _c["sfx"] = SFX[_c["id"]]
+
+# Extra accusations for the human prosecutor in multiplayer. Neutralised by any helpful card of the given kind.
+PROSECUTION_EXTRA = [
+    {"id": "g1", "title": "Think of the victim", "text": "Members of the jury, someone was harmed here. Someone has to answer for it.",
+     "law": "Appeal to emotion", "power": 9, "kind": "Principle",
+     "lesson": "A legal principle answers an emotional appeal: the jury must decide on the facts and the law, not on sympathy (art. 427 CPP)."},
+    {"id": "g2", "title": "Doubt the defence", "text": "Everything the defence offers comes from the accused and their friends. Why believe a word of it?",
+     "law": "Credibility attack", "power": 8, "kind": "Evidence",
+     "lesson": "Objective evidence answers an attack on credibility: records and documents do not depend on who presents them."},
+]

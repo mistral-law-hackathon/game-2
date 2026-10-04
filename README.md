@@ -12,6 +12,8 @@ Each case opens with a 10-second cinematic **reconstruction of the facts** (gene
 
 **Scene sounds:** each reconstruction shot has sound tags (`sfx` in `server/content.py`, e.g. `alarm+siren`, `glass+punch`), synthesised in code in `Verdict.BuildSceneFx`: siren, alarm, glass, punch, bar, store, cctv, typing, phone, door.
 
+**Multiplayer (prosecution vs defence):** "Multiplayer" on the menu. Both players open the same link. One creates a room (case + side) and gets a 4-letter code, and the other joins with it. Each round the prosecutor picks an accusation (the 3 case points + 2 generic ones in `PROSECUTION_EXTRA`), then the defence answers with up to 2 law cards. After 3 rounds both write or speak a closing, and Mistral judges both (`/api/room/create|join|act`, `GET /api/room/state`, in-memory rooms, clients poll every 0.5 s). For players on other machines, expose port 8080 publicly, e.g. `cloudflared tunnel --url http://localhost:8080`.
+
 The game teaches law by playing: every card shows its article and a plain-language explanation. After each play the jury explains why that argument worked or backfired.
 
 ## Cases
