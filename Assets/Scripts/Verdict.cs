@@ -8,7 +8,7 @@ public partial class Verdict : MonoBehaviour
 {
     const float W = 1280, H = 720;
     const int Threshold = 60, MaxPick = 2;
-    enum Phase { Loading, Menu, Create, Scene, Brief, Trial, Closing, Judging, End, Lobby, MpWait, MpTrial, MpEnd }
+    enum Phase { Loading, Menu, Create, Scene, Brief, Trial, Closing, Judging, End, Lobby, MpWait, MpTrial, MpEnd, Report }
     enum Mic { Idle, Starting, Recording, Busy }
 #if UNITY_WEBGL && !UNITY_EDITOR
     [System.Runtime.InteropServices.DllImport("__Internal")] static extern void MicStart(string go);
@@ -118,6 +118,7 @@ public partial class Verdict : MonoBehaviour
         hand.Clear(); hand.AddRange(cs.cards.OrderBy(_ => Random.value));
         played.Clear(); selected.Clear(); reactions.Clear(); record.Clear();
         argument = ""; verdict = null; resolved = false;
+        rounds.Clear(); report = null; reportLoading = false; reportTok++;
         if (intro) PlayScene(); else Go(Phase.Brief);
     }
 
@@ -223,6 +224,7 @@ public partial class Verdict : MonoBehaviour
         bool answered = false;
         int total = 0;
         var names = new List<string>();
+        rounds.Add(new RoundRec { move = mv.id, cards = selected.ToList() });
         foreach (var id in selected)
         {
             var c = hand.First(x => x.id == id);
@@ -258,7 +260,7 @@ public partial class Verdict : MonoBehaviour
     {
         Go(Phase.Judging);
         Play("whoosh", 0.7f);
-        var body = JsonUtility.ToJson(new VerdictReq { caseId = cs.id, cards = played.Select(c => c.id).ToList(), argument = argument.Trim(), meter = Mathf.RoundToInt(meter) });
+        var body = JsonUtility.ToJson(new VerdictReq { caseId = cs.id, cards = played.Select(c => c.id).ToList(), argument = argument.Trim(), meter = Mathf.RoundToInt(meter), rounds = rounds.ToList() });
         StartCoroutine(PostVerdict(body));
     }
 
@@ -275,6 +277,8 @@ public partial class Verdict : MonoBehaviour
         r ??= new VerdictResp { headline = "The judge is unavailable", feedback = "The AI judge could not be reached, so your closing was not scored." };
         r.strengths ??= new List<string>(); r.missed ??= new List<string>();
         verdict = r;
+        var rq = JsonUtility.FromJson<VerdictReq>(body); rq.score = r.score; rq.meter = Mathf.RoundToInt(Mathf.Clamp(meter + r.score, 0, 100));
+        StartCoroutine(FetchReport(JsonUtility.ToJson(rq)));
         meter = Mathf.Clamp(meter + r.score, 0, 100);
         popDelta = r.score; popT = Time.time;
         if (meter >= Threshold) won.Add(cs.id);
@@ -582,6 +586,7 @@ public partial class Verdict : MonoBehaviour
             case Phase.MpWait: DrawMpWait(); break;
             case Phase.MpTrial: DrawMpTrial(); break;
             case Phase.MpEnd: DrawMpEnd(); break;
+            case Phase.Report: DrawReport(); break;
         }
         if (mp) MpBanner();
     }
@@ -727,7 +732,7 @@ public partial class Verdict : MonoBehaviour
         Box(new Rect(0, 52, W, 1), Line);
         Txt(new Rect(24, 0, 200, 52), "VERDICT", 20, Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
         Txt(new Rect(0, 0, W, 52), cs.title + "   |   " + cs.charge + " (" + cs.law + ")", 15, Ink, TextAnchor.MiddleCenter);
-        string right = (phase == Phase.Trial || phase == Phase.MpTrial ? "ROUND " + (round + 1) + " / " + Rounds : phase == Phase.End || phase == Phase.MpEnd ? "JUDGMENT" : "CLOSING")
+        string right = (phase == Phase.Report ? "ANALYSIS" : phase == Phase.Trial || phase == Phase.MpTrial ? "ROUND " + (round + 1) + " / " + Rounds : phase == Phase.End || phase == Phase.MpEnd ? "JUDGMENT" : "CLOSING")
             + (mp ? "   \u00b7   " + Side(mpRole) : "");
         Txt(new Rect(W - 424, 0, 400, 52), right, 15, Accent, TextAnchor.MiddleRight, FontStyle.Bold);
     }
@@ -985,9 +990,10 @@ public partial class Verdict : MonoBehaviour
             y = Para(x + 18, y, w - 18, c.name + " (" + c.law + "): " + c.lesson, 12, Ink, FontStyle.Normal, 6);
         }
 
-        if (Btn(new Rect(W / 2 - 250, 664, 240, 44), "RETRY THIS CASE", false)) StartCase(caseIdx, false);
+        if (Btn(new Rect(W / 2 - 390, 664, 240, 44), "RETRY THIS CASE", false)) StartCase(caseIdx, false);
+        ReportBtn(new Rect(W / 2 - 130, 664, 260, 44), report, reportLoading);
         bool more = caseIdx + 1 < content.cases.Count;
-        if (Btn(new Rect(W / 2 + 10, 664, 240, 44), more ? "NEXT CASE" : "ALL CASES", true))
+        if (Btn(new Rect(W / 2 + 150, 664, 240, 44), more ? "NEXT CASE" : "ALL CASES", true))
         {
             if (more) StartCase(caseIdx + 1); else Go(Phase.Menu);
         }

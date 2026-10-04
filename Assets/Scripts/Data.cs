@@ -13,7 +13,9 @@ using System.Collections.Generic;
     public List<CardDef> cards;
 }
 [Serializable] public class Content { public List<CaseDef> cases; }
-[Serializable] public class VerdictReq { public string caseId, argument; public List<string> cards; public int meter; }
+[Serializable] public class RoundRec { public string move; public List<string> cards; }
+[Serializable] public class VerdictReq { public string caseId, argument; public List<string> cards; public int meter, score; public List<RoundRec> rounds; }
+[Serializable] public class Report { public string summary, error; public List<string> mistakes, proofs, precedents, nextTime, sources; }
 [Serializable] public class VerdictResp { public int score; public string headline, feedback; public List<string> strengths, missed; }
 [Serializable] public class GenReq { public string description; }
 [Serializable] public class ErrResp { public string error; }
@@ -27,6 +29,7 @@ using System.Collections.Generic;
     public List<string> dhand, phand, played, record;
     public List<MpReaction> reactions;
     public DuelVerdict verdict;
+    public Report report;
 }
 [Serializable] public class RoomJoin { public string code, role, error; public CaseDef caseDef; }
 [Serializable] public class RoomReq { public string code, role, a, caseId, moveId, text; public List<string> cards; }

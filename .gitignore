@@ -21,3 +21,4 @@
 .env
 __pycache__/
 server/tts_cache/
+server/rag_cache.json

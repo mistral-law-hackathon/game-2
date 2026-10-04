@@ -14,6 +14,8 @@ Each case opens with a 10-second cinematic **reconstruction of the facts** (gene
 
 **Multiplayer (prosecution vs defence):** "Multiplayer" on the menu. Both players open the same link. One creates a room (case + side) and gets a 4-letter code, and the other joins with it. Each round the prosecutor picks an accusation (the 3 case points + 2 generic ones in `PROSECUTION_EXTRA`), then the defence answers with up to 2 law cards. After 3 rounds both write or speak a closing, and Mistral judges both (`/api/room/create|join|act`, `GET /api/room/state`, in-memory rooms, clients poll every 0.5 s). For players on other machines, expose port 8080 publicly, e.g. `cloudflared tunnel --url http://localhost:8080`.
 
+**Case analysis (RAG):** after the verdict, "Full case analysis" opens a detailed debrief: how the trial went, your mistakes round by round with the correct reasoning, what had to be proven, comparable "if..., then..." situations, and tips. `server/rag.py` splits the reference in `server/knowledge/*.md` into sections, embeds them once with `mistral-embed` (cached in the gitignored `server/rag_cache.json`, lexical fallback offline), and retrieves the relevant ones for each trial. It always includes the elements-of-an-offence section and the sections citing the case's own articles. `POST /api/report` sends those excerpts and the trial record to Mistral, which cites them as [§4.2]. In multiplayer the server builds one shared report for both players. To extend the knowledge, add more `.md` files to `server/knowledge/`.
+
 The game teaches law by playing: every card shows its article and a plain-language explanation. After each play the jury explains why that argument worked or backfired.
 
 ## Cases

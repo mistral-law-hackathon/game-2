@@ -390,8 +390,11 @@ public partial class Verdict
             y2 = Para(x + 18, y2, w - 18, c.name + " (" + c.law + "): " + c.lesson, 12, Ink, FontStyle.Normal, 6);
         }
 
-        if (Btn(new Rect(W / 2 - 250, 664, 240, 44), "NEW ROOM", false)) { MpLeave(); OpenLobby(); }
-        if (Btn(new Rect(W / 2 + 10, 664, 240, 44), "MAIN MENU", true)) MpLeave();
+        if (Btn(new Rect(W / 2 - 390, 664, 240, 44), "NEW ROOM", false)) { MpLeave(); OpenLobby(); }
+        var rp = rs.report;
+        bool rpReady = rp != null && !string.IsNullOrEmpty(rp.summary);
+        ReportBtn(new Rect(W / 2 - 130, 664, 260, 44), rpReady || (rp != null && !string.IsNullOrEmpty(rp.error)) ? rp : null, !rpReady && (rp == null || string.IsNullOrEmpty(rp.error)));
+        if (Btn(new Rect(W / 2 + 150, 664, 240, 44), "MAIN MENU", true)) MpLeave();
     }
 
     void MpBanner()
