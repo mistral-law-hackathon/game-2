@@ -32,8 +32,10 @@ public class Verdict : MonoBehaviour
     GUIStyle st, area;
     Font fReg, fBold, fIt;
     readonly Dictionary<string, Texture2D> tex = new();
-    int shotShown = -1, reactSnd;
-    AudioSource sfx, amb;
+    int reactSnd, voTok, shot;
+    bool voPending, voiceOn = true;
+    float shotT0, prevLen, sceneEndT = -1;
+    AudioSource sfx, amb, vo;
     readonly Dictionary<string, AudioClip> clips = new();
     const int SR = 44100;
 
@@ -72,10 +74,11 @@ public class Verdict : MonoBehaviour
         Go(Phase.Menu);
     }
 
-    void Go(Phase p) { phase = p; phaseT = 0; }
+    void Go(Phase p) { Hush(); phase = p; phaseT = 0; }
 
     void Update()
     {
+        SceneTick();
         phaseT += Time.deltaTime;
         meterShown = Mathf.Lerp(meterShown, meter, 1 - Mathf.Exp(-4 * Time.deltaTime));
     }
@@ -98,10 +101,53 @@ public class Verdict : MonoBehaviour
 
     void PlayScene()
     {
-        shotShown = -1;
         Go(Phase.Scene);
-        amb.clip = clips["drone"]; amb.volume = 0.8f; amb.Play();
+        shot = 0; shotT0 = Time.time; prevLen = 0; sceneEndT = -1;
+        amb.clip = clips["drone"]; amb.loop = true; amb.volume = voiceOn ? 0.45f : 0.8f; amb.Play();
+        if (cs.scenes != null && cs.scenes.Count > 0) Say("narrator", cs.scenes[0], 0.3f);
     }
+
+    void SceneTick()
+    {
+        if (phase != Phase.Scene) return;
+        if (sceneEndT >= 0) { if (Time.time - sceneEndT > 0.5f) EndScene(); return; }
+        float lt = Time.time - shotT0;
+        bool talking = voPending || vo.isPlaying;
+        if (lt < 10f / 3f || (talking && lt < 15)) return;
+        if (shot < 2)
+        {
+            shot++; prevLen = lt; shotT0 = Time.time; Play("whoosh", 0.5f);
+            if (cs.scenes != null && shot < cs.scenes.Count) Say("narrator", cs.scenes[shot], 0.2f);
+        }
+        else sceneEndT = Time.time;
+    }
+
+    // ---------- voice (Gradium TTS via /api/tts) ----------
+    void Say(string voice, string text, float delay = 0)
+    {
+        if (!voiceOn || string.IsNullOrEmpty(text)) return;
+        StartCoroutine(SayCo(voice, text, ++voTok, delay));
+    }
+
+    IEnumerator SayCo(string voice, string text, int tok, float delay)
+    {
+        voPending = true;
+        if (delay > 0) yield return new WaitForSeconds(delay);
+        if (tok != voTok) yield break;
+        using var req = UnityWebRequestMultimedia.GetAudioClip(Base + "/api/tts?voice=" + voice + "&text=" + UnityWebRequest.EscapeURL(text), AudioType.WAV);
+        req.timeout = 20;
+        yield return req.SendWebRequest();
+        if (tok != voTok) yield break;
+        voPending = false;
+        if (req.result != UnityWebRequest.Result.Success) yield break;
+        var clip = DownloadHandlerAudioClip.GetContent(req);
+        if (clip == null) yield break;
+        vo.Stop(); vo.clip = clip; vo.Play();
+    }
+
+    void Hush() { voTok++; voPending = false; if (vo != null) vo.Stop(); }
+
+    void SpeakMove() => Say("prosecutor", cs.moves[round].text, 0.7f);
 
     void EndScene()
     {
@@ -133,6 +179,7 @@ public class Verdict : MonoBehaviour
             reactions.Add(new Reaction { title = "Prosecution's point stands: " + mv.title, body = "Nothing you presented answered it directly. Tip: look for the card that rebuts this exact point.", delta = -mv.power });
             total -= mv.power;
         }
+        Hush();
         meter = Mathf.Clamp(meter + total, 0, 100);
         popDelta = total; popT = Time.time;
         record.Add("Round " + (round + 1) + ": " + string.Join(", ", names) + "|" + total);
@@ -143,7 +190,7 @@ public class Verdict : MonoBehaviour
     void NextRound()
     {
         resolved = false; round++;
-        if (round >= cs.moves.Count) { Go(Phase.Closing); focusArg = true; }
+        if (round >= cs.moves.Count) { Go(Phase.Closing); focusArg = true; } else SpeakMove();
     }
 
     void SubmitClosing()
@@ -173,6 +220,7 @@ public class Verdict : MonoBehaviour
         Go(Phase.End);
         Play("gavel3", 0.9f);
         StartCoroutine(Later(0.75f, () => Play(meter >= Threshold ? "acquit" : "guilty", 0.9f)));
+        Say("judge", (meter >= Threshold ? "Not guilty. " : "Guilty. ") + r.headline + ". " + r.feedback, 1.6f);
     }
 
     IEnumerator Later(float t, System.Action a) { yield return new WaitForSeconds(t); a(); }
@@ -191,6 +239,7 @@ public class Verdict : MonoBehaviour
     {
         sfx = gameObject.AddComponent<AudioSource>();
         amb = gameObject.AddComponent<AudioSource>();
+        vo = gameObject.AddComponent<AudioSource>();
         var rng = new System.Random(7);
         float N() => (float)(rng.NextDouble() * 2 - 1);
         const float TAU = Mathf.PI * 2;
@@ -352,22 +401,23 @@ public class Verdict : MonoBehaviour
             Txt(new Rect(r.x + 76, r.y + 6, r.width - 90, r.height - 12), steps[i], 13, Ink, TextAnchor.MiddleLeft);
         }
         Txt(new Rect(0, 676, W, 24), "Goal: get at least " + Threshold + "% of the jury to vote NOT GUILTY.", 13, Muted, TextAnchor.MiddleCenter, FontStyle.Italic);
+        if (Btn(new Rect(W - 160, 670, 120, 34), voiceOn ? "VOICE: ON" : "VOICE: OFF", false)) { voiceOn = !voiceOn; Hush(); }
     }
 
     void DrawScene()
     {
-        const float per = 10f / 3f, total = 10.4f;
-        float t = phaseT;
-        int k = Mathf.Min(2, (int)(t / per));
-        if (k != shotShown) { shotShown = k; if (k > 0) Play("whoosh", 0.5f); }
+        const float per = 10f / 3f;
+        int k = shot;
+        float lt = Time.time - shotT0;
         GUI.BeginGroup(new Rect(0, 0, W, H));
         for (int j = Mathf.Max(0, k - 1); j <= k; j++)
         {
             var img = Tex(cs.id + "_" + (j + 1));
             if (img == null) continue;
-            float lt = t - j * per;
-            float a = j < k ? 1 : j == 0 ? Mathf.Clamp01(t / 0.8f) : Mathf.Clamp01(lt / 0.7f);
-            float z = 1.04f + 0.09f * (lt / per), dx = (j % 2 == 0 ? -1 : 1) * 36 * (lt / per);
+            float jt = j == k ? lt : lt + prevLen;
+            float a = j < k ? 1 : k == 0 ? Mathf.Clamp01(lt / 0.8f) : Mathf.Clamp01(lt / 0.7f);
+            float m = 1 - Mathf.Exp(-jt / 5f);
+            float z = 1.04f + 0.11f * m, dx = (j % 2 == 0 ? -1 : 1) * 44 * m;
             float iw = W * z, ih = W * img.height / (float)img.width * z;
             GUI.DrawTexture(new Rect((W - iw) / 2 + dx, (H - ih) / 2, iw, ih), img, ScaleMode.StretchToFill, false, 0, A(Color.white, a), 0, 0);
         }
@@ -382,15 +432,13 @@ public class Verdict : MonoBehaviour
 
         if (cs.scenes != null && k < cs.scenes.Count)
         {
-            float lt = t - k * per;
-            float ca = Mathf.Clamp01((lt - 0.3f) / 0.5f) * (k < 2 ? Mathf.Clamp01((per - lt) / 0.4f) : 1);
+            float ca = Mathf.Clamp01((lt - 0.3f) / 0.5f);
             Txt(new Rect(140, H - 64 - 120, W - 280, 100), cs.scenes[k], 24, A(Color.white, ca), TextAnchor.MiddleCenter, FontStyle.Italic);
         }
-        Box(new Rect(0, H - 64, W * Mathf.Clamp01(t / 10f), 2), A(Accent, 0.7f));
+        Box(new Rect(0, H - 64, W * Mathf.Clamp01((k + Mathf.Clamp01(lt / per)) / 3f), 2), A(Accent, 0.7f));
         Txt(new Rect(40, H - 62, 200, 62), (k + 1) + " / 3", 12, Muted, TextAnchor.MiddleLeft, FontStyle.Bold);
         if (Btn(new Rect(W - 170, H - 52, 130, 40), "SKIP", false)) { EndScene(); return; }
-        if (t > total - 0.5f) Box(new Rect(0, 0, W, H), A(Color.black, Mathf.Clamp01((t - (total - 0.5f)) / 0.5f)));
-        if (t > total && Event.current.type == EventType.Repaint) EndScene();
+        if (sceneEndT >= 0) Box(new Rect(0, 0, W, H), A(Color.black, Mathf.Clamp01((Time.time - sceneEndT) / 0.5f)));
     }
 
     void DrawBrief()
@@ -419,7 +467,7 @@ public class Verdict : MonoBehaviour
         y = Para(x, y + 26, w, "The jury starts at " + cs.start + "% Not guilty. Bring it to " + Threshold + "% or more.", 17, Ink, FontStyle.Bold, 10);
         Para(x, y, w, "3 rounds: the prosecution makes a point, you answer with up to 2 cards. Then you deliver your closing argument.", 15, Muted);
 
-        if (Btn(new Rect(760, 600, 300, 52), "ENTER THE COURTROOM", true)) { Go(Phase.Trial); resolved = false; Play("gavel"); }
+        if (Btn(new Rect(760, 600, 300, 52), "ENTER THE COURTROOM", true)) { Go(Phase.Trial); resolved = false; Play("gavel"); SpeakMove(); }
         if (Btn(new Rect(1076, 600, 134, 52), "Back", false)) Go(Phase.Menu);
         if (Btn(new Rect(70, 600, 240, 52), "REPLAY THE FACTS", false)) PlayScene();
     }
@@ -430,7 +478,7 @@ public class Verdict : MonoBehaviour
         Box(new Rect(0, 52, W, 1), Line);
         Txt(new Rect(24, 0, 200, 52), "VERDICT", 20, Accent, TextAnchor.MiddleLeft, FontStyle.Bold);
         Txt(new Rect(0, 0, W, 52), cs.title + "   |   " + cs.charge + " (" + cs.law + ")", 15, Ink, TextAnchor.MiddleCenter);
-        string right = phase == Phase.Trial ? "ROUND " + (round + 1) + " / " + cs.moves.Count : phase == Phase.End ? "VERDICT" : "CLOSING";
+        string right = phase == Phase.Trial ? "ROUND " + (round + 1) + " / " + cs.moves.Count : phase == Phase.End ? "JUDGMENT" : "CLOSING";
         Txt(new Rect(W - 224, 0, 200, 52), right, 15, Accent, TextAnchor.MiddleRight, FontStyle.Bold);
     }
 

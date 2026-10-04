@@ -1,6 +1,10 @@
 """Serves the WebGL build and proxies Mistral (the AI judge); the API key stays server-side."""
+import hashlib
 import json
 import os
+import re
+import threading
+import urllib.parse
 import urllib.request
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -24,6 +28,48 @@ load_env()
 API_KEY = os.environ.get("MISTRAL_API_KEY", "")
 MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")
 CASES = {c["id"]: c for c in C.CASES}
+GRADIUM_KEY = os.environ.get("GRADIUM_API_KEY", "")
+VOICES = {"narrator": "POBHtemksfWQbng0", "prosecutor": "r2sIQdqqoqgRJuXw", "judge": "4SZHfMpw-p46Ywgs"}
+TTS_DIR = ROOT / "server" / "tts_cache"
+
+
+def speakable(t):
+    t = re.sub(r"EUR\s?([\d,.]+)", r"\1 euros", t)
+    t = re.sub(r"\bArts?\.\s?", "Article ", t)
+    return t.replace(" - ", ", ").replace("'", "’")
+
+
+def tts(voice, text):
+    """Gradium text-to-speech, cached on disk so repeated lines are instant."""
+    text = speakable(str(text)[:900].strip())
+    vid = VOICES.get(voice, VOICES["narrator"])
+    f = TTS_DIR / (hashlib.sha1(f"{vid}|{text}".encode()).hexdigest()[:20] + ".wav")
+    if f.exists():
+        return f.read_bytes()
+    if not GRADIUM_KEY or not text:
+        raise RuntimeError("tts unavailable")
+    body = json.dumps({"text": text, "voice_id": vid, "output_format": "wav", "only_audio": True}).encode()
+    req = urllib.request.Request("https://api.gradium.ai/api/post/speech/tts", data=body, headers={
+        "x-api-key": GRADIUM_KEY, "Content-Type": "application/json", "User-Agent": "verdict-game/1.0"})
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        data = resp.read()
+    TTS_DIR.mkdir(exist_ok=True)
+    tmp = f.with_suffix(f".{threading.get_ident()}.tmp")
+    tmp.write_bytes(data)
+    tmp.replace(f)
+    return data
+
+
+def prewarm():
+    for c in C.CASES:
+        lines = [("narrator", s) for s in c.get("scenes", [])] + [("prosecutor", m["text"]) for m in c["moves"]]
+        for v, t in lines:
+            try:
+                tts(v, t)
+            except Exception as e:
+                print("tts prewarm failed:", e)
+                return
+    print("tts cache warm")
 
 
 def mistral_json(system, user, temperature=0.3, timeout=30):
@@ -105,6 +151,19 @@ class Handler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/content"):
             return self.send_json({"cases": C.CASES})
+        if self.path.startswith("/api/tts"):
+            q = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            try:
+                data = tts(q.get("voice", ["narrator"])[0], q.get("text", [""])[0])
+            except Exception as e:
+                self.log_error("tts error: %r", e)
+                return self.send_json({"error": "tts unavailable"}, 503)
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         return super().do_GET()
 
     def do_POST(self):
@@ -121,5 +180,7 @@ class Handler(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "8080"))
-    print(f"Serving {WEB_DIR} on http://localhost:{port} (model {MODEL}, key {'set' if API_KEY else 'MISSING'})")
+    print(f"Serving {WEB_DIR} on http://localhost:{port} (model {MODEL}, key {'set' if API_KEY else 'MISSING'}, voice {'on' if GRADIUM_KEY else 'off'})")
+    if GRADIUM_KEY:
+        threading.Thread(target=prewarm, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()

@@ -20,3 +20,4 @@
 .DS_Store
 .env
 __pycache__/
+server/tts_cache/

@@ -4,6 +4,8 @@ You are the defence lawyer. In each case the prosecution makes 3 points, and you
 
 Each case opens with a 10-second cinematic **reconstruction of the facts** (generated black-and-white stills with slow camera moves and captions). The visuals are neutral black and white, set in a formal serif (Libre Baskerville, OFL), with procedural sound effects: gavel, card selection, jury reactions and the verdict sting.
 
+**Voice (Gradium TTS):** a narrator reads the reconstruction captions, the prosecutor speaks each argument and the judge reads out the AI verdict. Speech is generated server-side through `GET /api/tts?voice=narrator|prosecutor|judge&text=...` (Gradium REST, WAV), cached in `server/tts_cache/` (gitignored), and prewarmed for all static lines at server start. Set `GRADIUM_API_KEY` in `.env`; without it the game runs silently (voice toggle on the menu).
+
 The game teaches law by playing: every card shows its article and a plain-language explanation. After each play the jury explains why that argument worked or backfired.
 
 ## Cases
