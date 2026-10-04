@@ -7,6 +7,7 @@ using System.Collections.Generic;
 {
     public string id, title, client, charge, law, definition, takeaway;
     public int start;
+    public List<string> scenes;
     public List<string> facts;
     public List<MoveDef> moves;
     public List<CardDef> cards;

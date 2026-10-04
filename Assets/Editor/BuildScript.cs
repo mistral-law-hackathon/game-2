@@ -20,7 +20,7 @@ public static class BuildScript
         c.backgroundColor = Color.black;
         cam.AddComponent<AudioListener>();
         cam.transform.position = new Vector3(0, 0, -10);
-        new GameObject("CardGame").AddComponent<Verdict>();
+        new GameObject("Verdict").AddComponent<Verdict>();
         EditorSceneManager.SaveScene(scene, ScenePath);
         EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
     }

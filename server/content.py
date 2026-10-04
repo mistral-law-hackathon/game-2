@@ -16,6 +16,11 @@ CASES = [
             "She immediately offered to pay for it.",
         ],
         "start": 35,
+        "scenes": [
+            "Friday, 7:40 pm. Lea, a nurse, pays for EUR 62 of groceries at the self-checkout - on the phone with her hospital.",
+            "Store CCTV: during the call, a EUR 19 phone charger goes into her handbag.",
+            "At the exit gate the guard stops her. She immediately offers to pay. The prosecutor charges her with theft.",
+        ],
         "takeaway": "Theft (art. 311-1) = taking + someone else's property + fraudulent INTENT. Without intent, there is no theft.",
         "keywords": ["intent", "intention", "forgot", "distract", "phone", "call", "hospital", "paid", "doubt", "innocen", "121-3", "good faith", "fraudulent"],
         "moves": [
@@ -57,6 +62,11 @@ CASES = [
             "Marc has already repaid EUR 1,600.",
         ],
         "start": 30,
+        "scenes": [
+            "Marc, a regional sales manager, pays for hotels and dinners with his company card: EUR 3,200 in three months.",
+            "The company accountant flags the personal expenses.",
+            "Marc shows an email from his director: 'Fine, we'll take it off your bonus.' He is charged with breach of trust.",
+        ],
         "takeaway": "Breach of trust (art. 314-1) = property handed over for a set purpose, then misused (detournement). An AGREED use is not a misuse. Unlike theft, there is no 'taking'.",
         "keywords": ["authoris", "authoriz", "agreed", "permission", "email", "director", "bonus", "deduct", "purpose", "detournement", "misappropriat", "314-1", "doubt", "consent"],
         "moves": [
@@ -98,6 +108,11 @@ CASES = [
             "The barman saw the whole scene.",
         ],
         "start": 30,
+        "scenes": [
+            "A Paris bar, late at night. Karim, a bike courier, argues with a stranger. Ten minutes later...",
+            "The bar camera: the man smashes a bottle and lunges. Two seconds later, Karim throws a single punch.",
+            "The man's jaw is broken - 20 days' incapacity. Karim is charged with intentional violence.",
+        ],
         "takeaway": "Self-defence (art. 122-5) = an unjustified attack + an immediate, necessary and proportionate response.",
         "keywords": ["122-5", "self-defen", "legitimate defen", "proportion", "bottle", "immediate", "simultaneous", "necess", "attack", "unjustified", "seconds", "barman", "doubt"],
         "moves": [
