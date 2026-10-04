@@ -659,7 +659,7 @@ public partial class CardGame
         Glow(Grow(panel, 60), A(Color.HSVToRGB(Time.time * 0.15f % 1, 0.8f, 1), 0.35f));
         Box(panel, new Color(0.12f, 0.04f, 0.16f, 0.97f), 26);
         Border(panel, Color.HSVToRGB(Time.time * 0.25f % 1, 0.7f, 1), 4, 26);
-        Txt(new Rect(panel.x, panel.y + 14, panel.width, 50), "THE FORGE", 42, new Color(1, 0.85f, 0.3f));
+        if (forgePhase < 2) Txt(new Rect(panel.x, panel.y + 14, panel.width, 50), "THE FORGE", 42, new Color(1, 0.85f, 0.3f));
         if (forgePhase == 0)
         {
             Txt(new Rect(panel.x + 40, 140, panel.width - 80, 50), "Describe ANY card idea in plain words. Mistral AI designs it live - the court keeps it balanced.", 19, Color.white, bold: false);
@@ -670,7 +670,7 @@ public partial class CardGame
             GUI.SetNextControlName("forge");
             forgeText = GUI.TextField(fr, forgeText, 120, fieldStyle);
             GUI.backgroundColor = Color.white;
-            if (forgeFocus) { GUI.FocusControl("forge"); forgeFocus = false; }
+            if (forgeFocus) { GUI.FocusControl("forge"); if (GUI.GetNameOfFocusedControl() == "forge") forgeFocus = false; }
             if (string.IsNullOrEmpty(forgeText)) Txt(new Rect(318, 210, 660, 56), "e.g. a pigeon that testifies against everyone", 20, new Color(1, 1, 1, 0.35f), TextAnchor.MiddleLeft, bold: false, shadow: false);
             Txt(new Rect(300, 285, 680, 26), "Need inspiration? Click one:", 16, new Color(1, 0.85f, 1), TextAnchor.MiddleLeft, bold: false);
             for (int i = 0; i < ForgeIdeas.Length; i++)

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>{{{ PRODUCT_NAME }}}</title>
+<style>
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#1a0f0a}
+#unity-canvas{position:absolute;left:0;top:0;width:100vw;height:100vh;display:block;outline:none}
+#loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#ffd447;font:bold 42px Arial,sans-serif;text-shadow:3px 3px 0 #c0392b}
+#bar{width:420px;height:16px;margin-top:22px;border:2px solid #ffd447;border-radius:10px;overflow:hidden}
+#fill{height:100%;width:0;background:#ffd447}
+</style>
+</head>
+<body>
+<canvas id="unity-canvas" tabindex="-1"></canvas>
+<div id="loading">OBJECTION!<div id="bar"><div id="fill"></div></div></div>
+<script>
+var s=document.createElement("script");
+s.src="Build/{{{ LOADER_FILENAME }}}";
+s.onload=function(){
+  createUnityInstance(document.querySelector("#unity-canvas"),{
+    dataUrl:"Build/{{{ DATA_FILENAME }}}",
+    frameworkUrl:"Build/{{{ FRAMEWORK_FILENAME }}}",
+    codeUrl:"Build/{{{ CODE_FILENAME }}}",
+    streamingAssetsUrl:"StreamingAssets",
+    companyName:{{{ JSON.stringify(COMPANY_NAME) }}},
+    productName:{{{ JSON.stringify(PRODUCT_NAME) }}},
+    productVersion:{{{ JSON.stringify(PRODUCT_VERSION) }}}
+  },function(p){document.getElementById("fill").style.width=(100*p)+"%";})
+  .then(function(){document.getElementById("loading").remove();})
+  .catch(function(e){alert(e);});
+};
+document.body.appendChild(s);
+</script>
+</body>
+</html>

@@ -35,6 +35,7 @@ public static class BuildScript
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
         PlayerSettings.WebGL.decompressionFallback = true;
         PlayerSettings.WebGL.dataCaching = false;
+        PlayerSettings.WebGL.template = "PROJECT:Full";
         PlayerSettings.defaultWebScreenWidth = 1280;
         PlayerSettings.defaultWebScreenHeight = 720;
 
