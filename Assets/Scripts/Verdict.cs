@@ -660,7 +660,17 @@ public partial class Verdict : MonoBehaviour
             case Phase.MpEnd: DrawMpEnd(); break;
             case Phase.Report: DrawReport(); break;
         }
+        if (phase != Phase.Loading && phase != Phase.Menu) MenuBtn();
         if (mp) MpBanner();
+    }
+
+    void MenuBtn()
+    {
+        if (!Btn(new Rect(W - 128, 10, 104, 32), "Menu", false, phase != Phase.Judging && !generating)) return;
+        if (mp) { MpLeave(); return; }
+        if (amb != null) amb.Stop();
+        sceneEndT = -1;
+        Go(Phase.Menu);
     }
 
     void DrawLoading()
@@ -766,8 +776,8 @@ public partial class Verdict : MonoBehaviour
         Box(new Rect(0, 0, W, 64), Color.black);
         Box(new Rect(0, H - 64, W, 64), Color.black);
         Lbl(new Rect(40, 0, 700, 64), CaseLabel + "   \u00b7   " + cs.title, 13, Ink, TextAnchor.MiddleLeft, true);
-        Box(new Rect(W - 300, 28, 8, 8), A(Red, 0.5f + 0.5f * Mathf.Sin(Time.time * 4)), 4);
-        TagR(new Rect(W - 285, 0, 245, 64), "Reconstruction of the Facts", Muted, TextAnchor.MiddleLeft);
+        Box(new Rect(W - 430, 28, 8, 8), A(Red, 0.5f + 0.5f * Mathf.Sin(Time.time * 4)), 4);
+        TagR(new Rect(W - 415, 0, 245, 64), "Reconstruction of the Facts", Muted, TextAnchor.MiddleLeft);
 
         if (cs.scenes != null && k < cs.scenes.Count)
         {
@@ -827,7 +837,7 @@ public partial class Verdict : MonoBehaviour
         Lbl(new Rect(0, 0, W, 52), cs.title + "   \u00b7   " + cs.charge + "  (" + cs.law + ")", 13, Sub, TextAnchor.MiddleCenter);
         string right = (phase == Phase.Report ? "Analysis" : phase == Phase.Trial || phase == Phase.MpTrial ? "Round " + (round + 1) + " / " + Rounds : phase == Phase.End || phase == Phase.MpEnd ? "Judgment" : "Closing")
             + (mp ? "  \u00b7  " + Side(mpRole) : "");
-        TagR(new Rect(W - 424, 18, 400, 16), right, Sub, TextAnchor.MiddleRight);
+        TagR(new Rect(W - 552, 18, 400, 16), right, Sub, TextAnchor.MiddleRight);
     }
 
     void DrawMeter(Rect r)
