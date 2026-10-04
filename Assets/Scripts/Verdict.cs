@@ -50,7 +50,7 @@ public partial class Verdict : MonoBehaviour
     Mic mic;
     float micT;
     string micErr, desc = "", genErr;
-    bool micForCreate, generating, dropFocus;
+    bool micForCreate, generating, dropFocus, createForMp;
     readonly Dictionary<string, AudioClip> clips = new();
     const int SR = 44100;
 
@@ -321,7 +321,8 @@ public partial class Verdict : MonoBehaviour
         }
         generating = false; desc = "";
         content.cases.Add(c);
-        StartCase(content.cases.Count - 1, false);
+        if (createForMp) { lobbyCase = content.cases.Count - 1; mpErr = null; Go(Phase.Lobby); Play("good", 0.6f); }
+        else StartCase(content.cases.Count - 1, false);
         StartCoroutine(PreloadCase(c));
     }
 
@@ -694,7 +695,7 @@ public partial class Verdict : MonoBehaviour
         float tw = 360, gap = 30, x0 = (W - (3 * tw + 2 * gap)) / 2;
         float by = 664, bh = 44, bw = (3 * tw + 2 * gap - 20) / 2;
         var cr = new Rect(x0, by, bw, bh);
-        if (Btn(cr, "", false)) { genErr = null; Go(Phase.Create); }
+        if (Btn(cr, "", false)) { genErr = null; createForMp = false; Go(Phase.Create); }
         Lbl(new Rect(cr.x + 24, cr.y + 6, cr.width - 48, 18), "Create Your Own Case", 14, Ink, TextAnchor.UpperLeft, true);
         Lbl(new Rect(cr.x + 24, cr.y + 24, cr.width - 48, 16), "Describe a situation - Mistral AI drafts the trial", 11, Muted);
         var mr = new Rect(x0 + bw + 20, by, bw, bh);
@@ -1018,10 +1019,10 @@ public partial class Verdict : MonoBehaviour
     {
         if (hero != null) GUI.DrawTexture(new Rect(0, 0, W, H), hero, ScaleMode.ScaleAndCrop, false, 0, A(Color.white, 0.12f), 0, 0);
         var p = new Rect(190, 60, 900, 600);
-        PanelBox(p, "New Case");
+        PanelBox(p, createForMp ? "New Case for Multiplayer" : "New Case");
         float x = p.x + 36, w = p.width - 72;
         float y = Para(x, p.y + 48, w, "Tell the court what happened.", 28, Ink, FontStyle.Bold, 10);
-        y = Para(x, y, w, "Describe any situation, real or invented. Mistral AI turns it into a full trial under French criminal law - the charge, the facts, the prosecution's points and your law cards.", 15, Muted, FontStyle.Normal, 18);
+        y = Para(x, y, w, "Describe any situation, real or invented. " + (createForMp ? "Mistral AI turns it into a full trial under French criminal law. It becomes the case for your multiplayer room: the prosecution gets the accusations, the defence the law cards." : "Mistral AI turns it into a full trial under French criminal law - the charge, the facts, the prosecution's points and your law cards."), 15, Muted, FontStyle.Normal, 18);
         var ta = new Rect(x, y, w, 150);
         Border(Grow(ta, 1), Line, 1, 8);
         GUI.enabled = !generating;
@@ -1048,7 +1049,7 @@ public partial class Verdict : MonoBehaviour
         if (status != null) Lbl(new Rect(x, p.yMax - 112, w, 22), status, 14, generating ? Sub : Red, TextAnchor.MiddleLeft);
         if (!generating) MicBtn(new Rect(x, p.yMax - 76, 260, 48), true);
         if (Btn(new Rect(p.xMax - 36 - 300, p.yMax - 76, 300, 48), generating ? "Drafting the Case..." : "Generate the Case", true, !generating && mic == Mic.Idle && desc.Trim().Length >= 15)) StartCoroutine(Generate());
-        if (Btn(new Rect(p.xMax - 36 - 300 - 16 - 130, p.yMax - 76, 130, 48), "Back", false, !generating)) Go(Phase.Menu);
+        if (Btn(new Rect(p.xMax - 36 - 300 - 16 - 130, p.yMax - 76, 130, 48), "Back", false, !generating)) Go(createForMp ? Phase.Lobby : Phase.Menu);
     }
 
     static Rect Grow(Rect r, float d) => new(r.x - d, r.y - d, r.width + 2 * d, r.height + 2 * d);

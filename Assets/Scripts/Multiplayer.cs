@@ -202,9 +202,11 @@ public partial class Verdict
         for (int k = 0; k < pick.Count; k++)
         {
             int i = pick[k];
-            if (Btn(new Rect(x + k % 2 * (cw2 + 12), y + k / 2 * 44, cw2, 38), content.cases[i].title, lobbyCase == i, !mpBusy)) { lobbyCase = i; Play("select"); }
+            if (Btn(new Rect(x + k % 2 * (cw2 + 12), y + k / 2 * 44, cw2, 38), IsGen(content.cases[i]) ? "New: " + content.cases[i].title : content.cases[i].title, lobbyCase == i, !mpBusy)) { lobbyCase = i; Play("select"); }
         }
-        y += (pick.Count + 1) / 2 * 44 + 12;
+        int gk = pick.Count;
+        if (Btn(new Rect(x + gk % 2 * (cw2 + 12), y + gk / 2 * 44, cw2, 38), "+ Generate a New Case", false, !mpBusy)) { genErr = null; createForMp = true; Go(Phase.Create); }
+        y += (pick.Count + 2) / 2 * 44 + 12;
         Tag(x, y, "Your Side", Sub);
         y += 26;
         float hw = (w - 12) / 2;
