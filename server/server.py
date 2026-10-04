@@ -30,6 +30,7 @@ MODEL = os.environ.get("MISTRAL_MODEL", "mistral-medium-latest")
 CASES = {c["id"]: c for c in C.CASES}
 GRADIUM_KEY = os.environ.get("GRADIUM_API_KEY", "")
 VOICES = {"narrator": "POBHtemksfWQbng0", "prosecutor": "r2sIQdqqoqgRJuXw", "judge": "4SZHfMpw-p46Ywgs"}
+PACE = {"narrator": -1.2, "prosecutor": -0.6, "judge": -0.6}  # Gradium padding_bonus: negative = faster
 TTS_DIR = ROOT / "server" / "tts_cache"
 
 
@@ -39,20 +40,36 @@ def speakable(t):
     return t.replace(" - ", ", ").replace("'", "’")
 
 
+def fix_wav(data):
+    """Gradium streams WAV with placeholder chunk sizes: write the real ones (correct clip length) and trim the silent tail."""
+    i = data.find(b"data", 12)
+    if data[:4] != b"RIFF" or i < 0:
+        return data
+    end, keep = len(data) - 1, 48000 * 2 // 8  # trim trailing silence, keep ~0.12 s (16-bit mono 48 kHz)
+    while end > i + 8 + keep and abs(int.from_bytes(data[end - 1:end + 1], "little", signed=True)) < 400:
+        end -= 2
+    b = bytearray(data[:min(len(data), end + 1 + keep)])
+    b[4:8] = (len(b) - 8).to_bytes(4, "little")
+    b[i + 4:i + 8] = (len(b) - i - 8).to_bytes(4, "little")
+    return bytes(b)
+
+
 def tts(voice, text):
     """Gradium text-to-speech, cached on disk so repeated lines are instant."""
     text = speakable(str(text)[:900].strip())
-    vid = VOICES.get(voice, VOICES["narrator"])
-    f = TTS_DIR / (hashlib.sha1(f"{vid}|{text}".encode()).hexdigest()[:20] + ".wav")
+    voice = voice if voice in VOICES else "narrator"
+    vid, pace = VOICES[voice], PACE[voice]
+    f = TTS_DIR / (hashlib.sha1(f"{vid}|{pace}|{text}".encode()).hexdigest()[:20] + ".wav")
     if f.exists():
-        return f.read_bytes()
+        return fix_wav(f.read_bytes())
     if not GRADIUM_KEY or not text:
         raise RuntimeError("tts unavailable")
-    body = json.dumps({"text": text, "voice_id": vid, "output_format": "wav", "only_audio": True}).encode()
+    body = json.dumps({"text": text, "voice_id": vid, "output_format": "wav", "only_audio": True,
+                       "json_config": {"padding_bonus": pace}}).encode()
     req = urllib.request.Request("https://api.gradium.ai/api/post/speech/tts", data=body, headers={
         "x-api-key": GRADIUM_KEY, "Content-Type": "application/json", "User-Agent": "verdict-game/1.0"})
     with urllib.request.urlopen(req, timeout=30) as resp:
-        data = resp.read()
+        data = fix_wav(resp.read())
     TTS_DIR.mkdir(exist_ok=True)
     tmp = f.with_suffix(f".{threading.get_ident()}.tmp")
     tmp.write_bytes(data)

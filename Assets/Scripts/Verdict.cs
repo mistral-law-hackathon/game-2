@@ -34,7 +34,8 @@ public class Verdict : MonoBehaviour
     readonly Dictionary<string, Texture2D> tex = new();
     int reactSnd, voTok, shot;
     bool voPending, voiceOn = true;
-    float shotT0, prevLen, sceneEndT = -1;
+    float shotT0, prevLen, sceneEndT = -1, voEnd;
+    readonly Dictionary<string, AudioClip> voCache = new();
     AudioSource sfx, amb, vo;
     readonly Dictionary<string, AudioClip> clips = new();
     const int SR = 44100;
@@ -72,6 +73,7 @@ public class Verdict : MonoBehaviour
         if (req.result != UnityWebRequest.Result.Success) { loadErr = "Could not reach the court server: " + req.error; yield break; }
         content = JsonUtility.FromJson<Content>(req.downloadHandler.text);
         Go(Phase.Menu);
+        StartCoroutine(Preload());
     }
 
     void Go(Phase p) { Hush(); phase = p; phaseT = 0; }
@@ -104,7 +106,7 @@ public class Verdict : MonoBehaviour
         Go(Phase.Scene);
         shot = 0; shotT0 = Time.time; prevLen = 0; sceneEndT = -1;
         amb.clip = clips["drone"]; amb.loop = true; amb.volume = voiceOn ? 0.45f : 0.8f; amb.Play();
-        if (cs.scenes != null && cs.scenes.Count > 0) Say("narrator", cs.scenes[0], 0.3f);
+        if (cs.scenes != null && cs.scenes.Count > 0) Say("narrator", cs.scenes[0]);
     }
 
     void SceneTick()
@@ -112,12 +114,12 @@ public class Verdict : MonoBehaviour
         if (phase != Phase.Scene) return;
         if (sceneEndT >= 0) { if (Time.time - sceneEndT > 0.5f) EndScene(); return; }
         float lt = Time.time - shotT0;
-        bool talking = voPending || vo.isPlaying;
-        if (lt < 10f / 3f || (talking && lt < 15)) return;
+        bool talking = voiceOn && (voPending || Time.time < voEnd + 0.15f);
+        if (lt < (voiceOn ? 1.2f : 10f / 3f) || (talking && lt < 15)) return;
         if (shot < 2)
         {
             shot++; prevLen = lt; shotT0 = Time.time; Play("whoosh", 0.5f);
-            if (cs.scenes != null && shot < cs.scenes.Count) Say("narrator", cs.scenes[shot], 0.2f);
+            if (cs.scenes != null && shot < cs.scenes.Count) Say("narrator", cs.scenes[shot]);
         }
         else sceneEndT = Time.time;
     }
@@ -126,7 +128,36 @@ public class Verdict : MonoBehaviour
     void Say(string voice, string text, float delay = 0)
     {
         if (!voiceOn || string.IsNullOrEmpty(text)) return;
-        StartCoroutine(SayCo(voice, text, ++voTok, delay));
+        int tok = ++voTok;
+        if (delay <= 0 && voCache.TryGetValue(voice + "|" + text, out var c)) { PlayVoice(c); return; }
+        StartCoroutine(SayCo(voice, text, tok, delay));
+    }
+
+    void PlayVoice(AudioClip c)
+    {
+        voPending = false;
+        vo.Stop(); vo.clip = c; vo.Play();
+        voEnd = Time.time + c.length;
+    }
+
+    IEnumerator Fetch(string voice, string text)
+    {
+        var key = voice + "|" + text;
+        if (voCache.ContainsKey(key)) yield break;
+        using var req = UnityWebRequestMultimedia.GetAudioClip(Base + "/api/tts?voice=" + voice + "&text=" + UnityWebRequest.EscapeURL(text), AudioType.WAV);
+        req.timeout = 20;
+        yield return req.SendWebRequest();
+        if (req.result != UnityWebRequest.Result.Success) yield break;
+        var clip = DownloadHandlerAudioClip.GetContent(req);
+        if (clip != null) voCache[key] = clip;
+    }
+
+    IEnumerator Preload()
+    {
+        foreach (var c in content.cases)
+            if (c.scenes != null) foreach (var line in c.scenes) yield return Fetch("narrator", line);
+        foreach (var c in content.cases)
+            foreach (var m in c.moves) yield return Fetch("prosecutor", m.text);
     }
 
     IEnumerator SayCo(string voice, string text, int tok, float delay)
@@ -134,18 +165,13 @@ public class Verdict : MonoBehaviour
         voPending = true;
         if (delay > 0) yield return new WaitForSeconds(delay);
         if (tok != voTok) yield break;
-        using var req = UnityWebRequestMultimedia.GetAudioClip(Base + "/api/tts?voice=" + voice + "&text=" + UnityWebRequest.EscapeURL(text), AudioType.WAV);
-        req.timeout = 20;
-        yield return req.SendWebRequest();
+        yield return Fetch(voice, text);
         if (tok != voTok) yield break;
         voPending = false;
-        if (req.result != UnityWebRequest.Result.Success) yield break;
-        var clip = DownloadHandlerAudioClip.GetContent(req);
-        if (clip == null) yield break;
-        vo.Stop(); vo.clip = clip; vo.Play();
+        if (voCache.TryGetValue(voice + "|" + text, out var c)) PlayVoice(c);
     }
 
-    void Hush() { voTok++; voPending = false; if (vo != null) vo.Stop(); }
+    void Hush() { voTok++; voPending = false; voEnd = 0; if (vo != null) vo.Stop(); }
 
     void SpeakMove() => Say("prosecutor", cs.moves[round].text, 0.7f);
 
