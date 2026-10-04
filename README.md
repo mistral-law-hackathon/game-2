@@ -6,6 +6,12 @@ Each case opens with a 10-second cinematic **reconstruction of the facts** (gene
 
 **Voice (Gradium TTS):** a narrator reads the reconstruction captions, the prosecutor speaks each argument and the judge reads out the AI verdict. Speech is generated server-side through `GET /api/tts?voice=narrator|prosecutor|judge&text=...` (Gradium REST, WAV), cached in `server/tts_cache/` (gitignored), and prewarmed for all static lines at server start. Set `GRADIUM_API_KEY` in `.env`; without it the game runs silently (voice toggle on the menu).
 
+**Create a case:** "Create a case from your own story" on the menu. Describe any situation (typed or spoken) and `POST /api/generate` asks Mistral (`MISTRAL_GEN_MODEL`, default `mistral-large-latest`, JSON mode) for a full case: charge and article, facts, 3 scene captions with sound tags, 3 prosecution points and 8 cards (3 rebuttals, 3 helpers, 2 traps). The server validates and clamps it. Reconstructions reuse the closest still set (`look`: theft / trust / defence). Generated cases are flagged as AI-written on the brief.
+
+**Spoken input:** "Speak instead" on the closing-argument and create screens records the mic in the browser (`Assets/Plugins/WebGL/Mic.jslib`, MediaRecorder) and posts it to `POST /api/stt`, which proxies to Mistral Voxtral transcription (`MISTRAL_STT_MODEL`, default `voxtral-mini-latest`). The transcript lands in the text box for editing. Needs HTTPS (or localhost) and mic permission.
+
+**Scene sounds:** each reconstruction shot has sound tags (`sfx` in `server/content.py`, e.g. `alarm+siren`, `glass+punch`), synthesised in code in `Verdict.BuildSceneFx`: siren, alarm, glass, punch, bar, store, cctv, typing, phone, door.
+
 The game teaches law by playing: every card shows its article and a plain-language explanation. After each play the jury explains why that argument worked or backfired.
 
 ## Cases

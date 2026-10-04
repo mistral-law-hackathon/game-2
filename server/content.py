@@ -140,3 +140,9 @@ CASES = [
         ],
     },
 ]
+
+# Reconstruction sound effects per shot ("a+b" = b starts a moment after a). Synthesised in Verdict.cs.
+SFX = {"theft": ["store", "cctv", "alarm+siren"], "trust": ["store", "typing", "phone"], "defence": ["bar", "glass+punch", "siren"]}
+for _c in CASES:
+    _c.setdefault("look", _c["id"])
+    _c["sfx"] = SFX[_c["id"]]
