@@ -97,6 +97,7 @@ public partial class Verdict : MonoBehaviour
         micErr = null; phase = p; phaseT = 0;
     }
 
+    Vector2 menuScroll;
     static bool IsGen(CaseDef c) => c.id.StartsWith("gen");
     string CaseLabel => !IsGen(cs) ? "CASE " + (caseIdx + 1) : "YOUR CASE";
     static string Look(CaseDef c) => string.IsNullOrEmpty(c.look) ? c.id : c.look;
@@ -681,38 +682,65 @@ public partial class Verdict : MonoBehaviour
         Txt(new Rect(0, 130, W, 28), "You are the defence lawyer. Answer the prosecution with real law, and win the jury.", 17, Ink, TextAnchor.MiddleCenter);
 
         float tw = 360, gap = 30, x0 = (W - (3 * tw + 2 * gap)) / 2;
-        int nb = 0;
-        for (int i = 0; i < content.cases.Count && nb < 6; i++)
+        float by = 664, bh = 44, bw = (3 * tw + 2 * gap - 20) / 2;
+        var cr = new Rect(x0, by, bw, bh);
+        if (Btn(cr, "", false)) { genErr = null; Go(Phase.Create); }
+        Lbl(new Rect(cr.x + 24, cr.y + 6, cr.width - 48, 18), "Create Your Own Case", 14, Ink, TextAnchor.UpperLeft, true);
+        Lbl(new Rect(cr.x + 24, cr.y + 24, cr.width - 48, 16), "Describe a situation - Mistral AI drafts the trial", 11, Muted);
+        var mr = new Rect(x0 + bw + 20, by, bw, bh);
+        if (Btn(mr, "", false)) OpenLobby();
+        Lbl(new Rect(mr.x + 24, mr.y + 6, mr.width - 48, 18), "Multiplayer", 14, Ink, TextAnchor.UpperLeft, true);
+        Lbl(new Rect(mr.x + 24, mr.y + 24, mr.width - 48, 16), "Prosecution vs. defence, on two screens", 11, Muted);
+        if (Btn(new Rect(W - 150, 36, 110, 30), voiceOn ? "Voice: On" : "Voice: Off", false)) { voiceOn = !voiceOn; Hush(); }
+
+        var built = new List<int>();
+        for (int i = 0; i < content.cases.Count; i++) if (!IsGen(content.cases[i])) built.Add(i);
+        const float imgH = 240, ch = 372, rg = 28;
+        var view = new Rect(x0 - 8, 168, 3 * tw + 2 * gap + 40, 468);
+        int rows = (built.Count + 2) / 3;
+        float contentH = rows * ch + (rows - 1) * rg + 16, maxS = Mathf.Max(0, contentH - view.height);
+        var ev = Event.current;
+        bool inView = view.Contains(ev.mousePosition);
+        var track = new Rect(view.xMax - 10, view.y + 8, 4, view.height - 16);
+        if (ev.type == EventType.ScrollWheel && inView)
         {
+            menuScroll.y = Mathf.Clamp(menuScroll.y + Mathf.Sign(ev.delta.y) * Mathf.Max(80, Mathf.Abs(ev.delta.y) * 25), 0, maxS);
+            ev.Use();
+        }
+        if (maxS > 0 && (ev.type == EventType.MouseDown || ev.type == EventType.MouseDrag) && Grow(track, 8).Contains(ev.mousePosition))
+        {
+            menuScroll.y = Mathf.Clamp01((ev.mousePosition.y - track.y) / track.height) * maxS;
+            ev.Use();
+        }
+        menuScroll.y = Mathf.Clamp(menuScroll.y, 0, maxS);
+        menuScroll = GUI.BeginScrollView(view, menuScroll, new Rect(0, 0, view.width - 24, Mathf.Max(contentH, view.height)), GUIStyle.none, GUIStyle.none);
+        for (int nb = 0; nb < built.Count; nb++)
+        {
+            int i = built[nb];
             var c = content.cases[i];
-            if (IsGen(c)) continue;
-            var r = new Rect(x0 + nb % 3 * (tw + gap), 176 + nb / 3 * 240, tw, 224);
-            nb++;
-            bool h = Hover(r);
+            var r = new Rect(8 + nb % 3 * (tw + gap), 8 + nb / 3 * (ch + rg), tw, ch);
+            bool h = inView && Hover(r);
             var img = Tex(Look(c) + "_1");
-            var ir = new Rect(r.x, r.y, r.width, 86);
-            if (img != null) GUI.DrawTexture(ir, img, ScaleMode.ScaleAndCrop, false, 0, A(Color.white, h ? 1 : 0.78f), Vector4.zero, new Vector4(10, 10, 0, 0));
-            Box(new Rect(r.x, ir.yMax, r.width, r.height - ir.height), A(Panel, h ? 0.9f : 0.6f), 0);
+            var ir = new Rect(r.x, r.y, r.width, imgH);
+            if (img != null) GUI.DrawTexture(ir, img, ScaleMode.ScaleAndCrop, false, 0, A(Color.white, h ? 1 : 0.85f), Vector4.zero, new Vector4(10, 10, 0, 0));
+            Box(new Rect(r.x, ir.yMax, r.width, r.height - ir.height), A(Panel, h ? 0.95f : 0.75f), 0);
             Border(r, h ? Ink : Line, 1, 10);
             float x = r.x + 20, w = r.width - 40;
-            Tag(x, ir.yMax + 12, "Case " + nb, Muted);
+            Tag(x, ir.yMax + 12, "Case " + (nb + 1), Muted);
             if (won.Contains(c.id)) TagR(new Rect(x, ir.yMax + 12, w, 16), "Acquitted", Green, TextAnchor.UpperRight);
             Txt(new Rect(x, ir.yMax + 30, w, 26), c.title, 19, Ink, TextAnchor.UpperLeft, FontStyle.Bold);
             Lbl(new Rect(x, ir.yMax + 58, w, 16), c.charge + "   \u00b7   " + c.law, 11, Sub);
-            if (Btn(new Rect(x, r.yMax - 46, w, 34), "Defend This Client", true)) StartCase(i);
+            if (Btn(new Rect(x, r.yMax - 44, w, 32), "Defend This Client", true) && inView) StartCase(i);
         }
-
-        float sy = 620, sh = 0;
-        float by = sy + sh + 40, bh = 48, bw = (3 * tw + 2 * gap - 20) / 2;
-        var cr = new Rect(x0, by, bw, bh);
-        if (Btn(cr, "", false)) { genErr = null; Go(Phase.Create); }
-        Lbl(new Rect(cr.x + 24, cr.y + 7, cr.width - 48, 18), "Create Your Own Case", 14, Ink, TextAnchor.UpperLeft, true);
-        Lbl(new Rect(cr.x + 24, cr.y + 26, cr.width - 48, 16), "Describe a situation - Mistral AI drafts the trial", 11, Muted);
-        var mr = new Rect(x0 + bw + 20, by, bw, bh);
-        if (Btn(mr, "", false)) OpenLobby();
-        Lbl(new Rect(mr.x + 24, mr.y + 7, mr.width - 48, 18), "Multiplayer", 14, Ink, TextAnchor.UpperLeft, true);
-        Lbl(new Rect(mr.x + 24, mr.y + 26, mr.width - 48, 16), "Prosecution vs. defence, on two screens", 11, Muted);
-        if (Btn(new Rect(W - 150, 36, 110, 30), voiceOn ? "Voice: On" : "Voice: Off", false)) { voiceOn = !voiceOn; Hush(); }
+        GUI.EndScrollView();
+        if (maxS > 0)
+        {
+            Box(track, A(Line, 0.8f), 2);
+            float th = track.height * view.height / contentH;
+            Box(new Rect(track.x, track.y + (track.height - th) * menuScroll.y / maxS, track.width, th), A(Gold, 0.85f), 2);
+            if (menuScroll.y < maxS - 10)
+                Lbl(new Rect(view.x, view.yMax + 2, view.width - 24, 18), "Scroll down for cases 4\u2013" + built.Count + "  \u2193", 11, Sub, TextAnchor.MiddleRight);
+        }
     }
 
     void DrawScene()
