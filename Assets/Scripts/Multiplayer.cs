@@ -153,7 +153,7 @@ public partial class Verdict
         if (caseIdx < 0) caseIdx = 99;
         round = 0; meter = meterShown = cs.start;
         selected.Clear(); reactions.Clear(); argument = ""; verdict = null; mpSel = null;
-        if (caseIdx < 3) PlayScene(); else Go(Phase.Brief);
+        if (!IsGen(cs)) PlayScene(); else Go(Phase.Brief);
     }
 
     void MpEnd()
@@ -195,15 +195,16 @@ public partial class Verdict
         float x = l.x + 26, w = l.width - 52, y = l.y + 48;
         Tag(x, y, "The Case", Sub);
         y += 26;
-        int n = content.cases.Count;
-        for (int i = 0; i < n; i++)
+        var pick = new List<int>();
+        for (int i = 0; i < content.cases.Count; i++) if (!IsGen(content.cases[i])) pick.Add(i);
+        for (int i = System.Math.Max(0, content.cases.Count - 2); i < content.cases.Count; i++) if (IsGen(content.cases[i])) pick.Add(i);
+        float cw2 = (w - 12) / 2;
+        for (int k = 0; k < pick.Count; k++)
         {
-            if (i >= 3 && i < n - 2) continue;
-            var c = content.cases[i];
-            if (Btn(new Rect(x, y, w, 38), c.title + "   \u00b7   " + c.charge, lobbyCase == i, !mpBusy)) { lobbyCase = i; Play("select"); }
-            y += 44;
+            int i = pick[k];
+            if (Btn(new Rect(x + k % 2 * (cw2 + 12), y + k / 2 * 44, cw2, 38), content.cases[i].title, lobbyCase == i, !mpBusy)) { lobbyCase = i; Play("select"); }
         }
-        y += 12;
+        y += (pick.Count + 1) / 2 * 44 + 12;
         Tag(x, y, "Your Side", Sub);
         y += 26;
         float hw = (w - 12) / 2;

@@ -155,8 +155,8 @@ def judge(data):
 
 
 GEN = {}
-LOOKS = ("theft", "trust", "defence")
-SFX = ("siren", "alarm", "glass", "punch", "bar", "store", "cctv", "typing", "phone", "door")
+LOOKS = ("theft", "trust", "defence", "fraud", "recel", "damage")
+SFX = ("siren", "alarm", "glass", "punch", "bar", "store", "cctv", "typing", "phone", "door", "spray", "train", "crowd")
 KINDS = ("Principle", "Evidence", "Witness", "Argument")
 GEN_PROMPT = """You design cases for VERDICT, an educational courtroom game about FRENCH criminal law for people with NO legal background.
 The player is the DEFENCE lawyer. From the user's description, write one realistic case with a defensible legal angle (a missing element of the offence, or a legal defence), citing REAL articles of the French Code penal / Code de procedure penale. Never invent articles. Serious, factual, plain English.
@@ -170,8 +170,8 @@ Reply with JSON only, exactly this shape:
  "definition": "1-2 plain sentences: the legal elements of the offence",
  "facts": ["5 short facts, max 15 words each, including the facts the defence can use"],
  "scenes": ["exactly 3 cinematic narration captions telling the story in order, max 16 words each; the last one ends with 'Charge: <offence>.'"],
- "sfx": ["one sound per scene, from: siren, alarm, glass, punch, bar, store, cctv, typing, phone, door"],
- "look": "closest image set: theft (shop, CCTV, security guard), trust (office, company money, documents) or defence (bar at night, fight)",
+ "sfx": ["one sound per scene, from: siren, alarm, glass, punch, bar, store, cctv, typing, phone, door, spray, train, crowd"],
+ "look": "closest image set: theft (shop, CCTV, security guard), trust (office, company money, documents), defence (bar at night, fight), fraud (online sale, laptop, rejected tickets, police desk), recel (metro handover, police at the door, invoice) or damage (graffiti, street at night, shop shutter)",
  "takeaway": "One sentence: Offence (art.) = its elements, and the key lesson of this case.",
  "keywords": ["8-12 lowercase words or stems a good closing argument would use"],
  "start": "integer 25-40, initial % of the jury voting not guilty",

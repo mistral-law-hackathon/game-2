@@ -97,7 +97,8 @@ public partial class Verdict : MonoBehaviour
         micErr = null; phase = p; phaseT = 0;
     }
 
-    string CaseLabel => caseIdx < 3 ? "CASE " + (caseIdx + 1) : "YOUR CASE";
+    static bool IsGen(CaseDef c) => c.id.StartsWith("gen");
+    string CaseLabel => !IsGen(cs) ? "CASE " + (caseIdx + 1) : "YOUR CASE";
     static string Look(CaseDef c) => string.IsNullOrEmpty(c.look) ? c.id : c.look;
 
     void Update()
@@ -497,6 +498,32 @@ public partial class Verdict : MonoBehaviour
             float n = N(); dl += (n - dl) * 0.05f;
             return (Mathf.Sin(TAU * 62 * t) * Mathf.Exp(-t * 9) * 0.8f + dl * Mathf.Exp(-t * 14) * 3f + (t > 0.12f ? N() * Mathf.Exp(-(t - 0.12f) * 30) * 0.08f : 0)) * 0.8f;
         });
+        float sp1 = 0, spn = 0;
+        clips["fx_spray"] = Synth("spray", 3.6f, t =>
+        {
+            float v = 0;
+            if (t < 0.5f) { float c = t % 0.125f; v += Mathf.Sin(TAU * 3100 * c) * Mathf.Exp(-c * 90) * 0.35f; }
+            float n = N(), hp = n - spn; spn = n; sp1 += (hp - sp1) * 0.5f;
+            float on = (t > 0.7f && t < 1.9f) || (t > 2.2f && t < 3.4f) ? 1 : 0;
+            return v + sp1 * on * 0.5f * Mathf.Min(1, (3.6f - t) / 0.3f);
+        });
+        float tr1 = 0, tr2 = 0;
+        clips["fx_train"] = Synth("train", 5.5f, t =>
+        {
+            float n = N(); tr1 += (n - tr1) * 0.03f; tr2 += (n - tr2) * 0.004f;
+            float env = Mathf.Sin(Mathf.PI * Mathf.Clamp01(t / 5.5f));
+            float clack = 0, c = t % 0.42f; if (t > 1 && t < 4.6f) clack = (N() * Mathf.Exp(-c * 60) + Mathf.Sin(TAU * 140 * c) * Mathf.Exp(-c * 40)) * 0.25f;
+            float squeal = t > 3.6f && t < 5f ? Mathf.Sin(TAU * (2300 + 120 * Mathf.Sin(TAU * 3 * t)) * t) * 0.05f * Mathf.Sin(Mathf.PI * (t - 3.6f) / 1.4f) : 0;
+            return ((tr1 - tr2) * 3.2f + Mathf.Sin(TAU * 48 * t) * 0.12f) * env + clack * env + squeal;
+        });
+        float cr1 = 0, cr2 = 0;
+        clips["fx_crowd"] = Synth("crowd", 5f, t =>
+        {
+            float n = N(); cr1 += (n - cr1) * 0.2f; cr2 += (n - cr2) * 0.03f;
+            float sw = 0.7f + 0.3f * Mathf.Sin(TAU * 0.6f * t) * Mathf.Sin(TAU * 1.7f * t + 1);
+            float chant = Mathf.Sin(TAU * 1.6f * t) > 0.6f ? 0.25f : 0;
+            return (cr1 - cr2) * (sw + chant) * 1.6f * Mathf.Min(1, t / 0.8f) * Mathf.Min(1, (5 - t) / 1f);
+        });
     }
 
     // ---------- drawing helpers ----------
@@ -654,36 +681,28 @@ public partial class Verdict : MonoBehaviour
         Txt(new Rect(0, 130, W, 28), "You are the defence lawyer. Answer the prosecution with real law, and win the jury.", 17, Ink, TextAnchor.MiddleCenter);
 
         float tw = 360, gap = 30, x0 = (W - (3 * tw + 2 * gap)) / 2;
-        for (int i = 0; i < content.cases.Count && i < 3; i++)
+        int nb = 0;
+        for (int i = 0; i < content.cases.Count && nb < 6; i++)
         {
             var c = content.cases[i];
-            var r = new Rect(x0 + i * (tw + gap), 192, tw, 350);
+            if (IsGen(c)) continue;
+            var r = new Rect(x0 + nb % 3 * (tw + gap), 176 + nb / 3 * 240, tw, 224);
+            nb++;
             bool h = Hover(r);
             var img = Tex(Look(c) + "_1");
-            var ir = new Rect(r.x, r.y, r.width, 156);
+            var ir = new Rect(r.x, r.y, r.width, 86);
             if (img != null) GUI.DrawTexture(ir, img, ScaleMode.ScaleAndCrop, false, 0, A(Color.white, h ? 1 : 0.78f), Vector4.zero, new Vector4(10, 10, 0, 0));
             Box(new Rect(r.x, ir.yMax, r.width, r.height - ir.height), A(Panel, h ? 0.9f : 0.6f), 0);
             Border(r, h ? Ink : Line, 1, 10);
-            float x = r.x + 22, w = r.width - 44;
-            Tag(x, ir.yMax + 16, "Case " + (i + 1), Muted);
-            if (won.Contains(c.id)) TagR(new Rect(x, ir.yMax + 16, w, 16), "Acquitted", Green, TextAnchor.UpperRight);
-            float y = Para(x, ir.yMax + 36, w, c.title, 21, Ink, FontStyle.Bold, 6);
-            y = Para(x, y, w, c.charge, 14, Ink, FontStyle.Normal, 4);
-            Lbl(new Rect(x, y, w, 16), c.law, 11, Sub);
-            if (Btn(new Rect(x, r.yMax - 56, w, 40), "Defend This Client", true)) StartCase(i);
+            float x = r.x + 20, w = r.width - 40;
+            Tag(x, ir.yMax + 12, "Case " + nb, Muted);
+            if (won.Contains(c.id)) TagR(new Rect(x, ir.yMax + 12, w, 16), "Acquitted", Green, TextAnchor.UpperRight);
+            Txt(new Rect(x, ir.yMax + 30, w, 26), c.title, 19, Ink, TextAnchor.UpperLeft, FontStyle.Bold);
+            Lbl(new Rect(x, ir.yMax + 58, w, 16), c.charge + "   \u00b7   " + c.law, 11, Sub);
+            if (Btn(new Rect(x, r.yMax - 46, w, 34), "Defend This Client", true)) StartCase(i);
         }
 
-        string[] steps = { "Watch the facts and read the charge", "Answer the prosecution with up to two law cards", "Deliver your closing - the AI judge scores it" };
-        float sy = 566, sh = 48;
-        for (int i = 0; i < 3; i++)
-        {
-            var r = new Rect(x0 + i * (tw + gap), sy, tw, sh);
-            Lbl(new Rect(r.x, r.y - 6, 48, sh), (i + 1).ToString("00"), 22, Muted, TextAnchor.MiddleLeft);
-            Box(new Rect(r.x + 50, r.y + 6, 1, sh - 12), Line);
-            Txt(new Rect(r.x + 66, r.y, r.width - 66, sh), steps[i], 14, Ink, TextAnchor.MiddleLeft);
-        }
-        Box(new Rect(x0, sy + sh + 20, 3 * tw + 2 * gap, 1), Line);
-
+        float sy = 620, sh = 0;
         float by = sy + sh + 40, bh = 48, bw = (3 * tw + 2 * gap - 20) / 2;
         var cr = new Rect(x0, by, bw, bh);
         if (Btn(cr, "", false)) { genErr = null; Go(Phase.Create); }
@@ -758,7 +777,7 @@ public partial class Verdict : MonoBehaviour
         Tag(x, y, "Your Objective", Sub);
         y = Para(x, y + 24, w, BriefGoal, 17, Ink, FontStyle.Bold, 10);
         y = Para(x, y, w, BriefHow, 15, Muted, FontStyle.Normal, 22);
-        if (caseIdx >= 3)
+        if (IsGen(cs))
         {
             Box(new Rect(x, y, w, 1), Line);
             Para(x, y + 16, w, "This case was written by Mistral AI from your description. Treat its legal details as a learning aid, not legal advice.", 13, Muted, FontStyle.Italic);
@@ -770,7 +789,7 @@ public partial class Verdict : MonoBehaviour
             if (Btn(new Rect(760, 600, 300, 52), "Enter the Courtroom", true)) { Go(Phase.Trial); resolved = false; Play("gavel"); SpeakMove(); }
             if (Btn(new Rect(1076, 600, 134, 52), "Back", false)) Go(Phase.Menu);
         }
-        if (caseIdx < 3 && Btn(new Rect(70, 600, 240, 52), "Replay the Facts", false)) PlayScene();
+        if (!IsGen(cs) && Btn(new Rect(70, 600, 240, 52), "Replay the Facts", false)) PlayScene();
     }
 
     void TopBar()
